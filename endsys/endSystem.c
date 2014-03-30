@@ -14,6 +14,9 @@ int main( int argc, const char* argv[] )
 {
 	readcfgs();
 	printf("STARTUP: Config files have been read\n");
+
+	chksum_crc32gentab();
+	printf("STARTUP: CRC has been setup\n");
 	
 	char cmd[80];
 	printf("#");
@@ -78,7 +81,7 @@ int main( int argc, const char* argv[] )
 			printf("MTU <size>\n");	
 			printf("set-edge-router <IP> <Port>\n");
 			printf("printSettings\n");
-			printf("rereadConfig\n");		
+			printf("rereadConfig\n");			
 		}
 		else		
 		{

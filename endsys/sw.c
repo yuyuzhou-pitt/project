@@ -28,7 +28,7 @@ void sw_readInCfg()
    	}
 }
 
-int getAppID()
+int sw_getAppID()
 {
 	int pid = getpid();
 	return pid;

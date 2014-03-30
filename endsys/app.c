@@ -51,7 +51,7 @@ unsigned long getFileSize(char filename[FILENAMESIZE])
 		return 0;
 }
 
-int getAppID()
+int app_getAppID()
 {
 	int pid = getpid();
 	return pid;
@@ -63,8 +63,9 @@ struct message message_encapsulation_first(char* DEST_FILE)
 	message.data = (char *)malloc(strlen(DEST_FILE));
 	message.data = DEST_FILE;
 	message.end_flag[0] = '0';
-	snprintf(message.app_id, sizeof(message.app_id), "%d", getAppID());
+	snprintf(message.app_id, sizeof(message.app_id), "%d", app_getAppID());
 	snprintf(message.length, sizeof(message.length), "%d", strlen(message.data));
+	snprintf(message.checksum, sizeof(message.checksum), "%d",chksum_crc32((unsigned char*) message.data, strlen(message.data)));
 	return message;
 }
 
@@ -92,13 +93,20 @@ struct message message_encapsulation(struct metadata MD, int frag)
 	fclose(fp);
 
 	message.end_flag[0] = '0';
-	snprintf(message.app_id, sizeof(message.app_id), "%d", getAppID());
+	snprintf(message.app_id, sizeof(message.app_id), "%d", app_getAppID());
 	snprintf(message.length, sizeof(message.length), "%d", strlen(message.data));
+	snprintf(message.checksum, sizeof(message.checksum), "%d",chksum_crc32((unsigned char*) message.data, strlen(message.data)));
 	return message;
 }
 
 void message_decapsulation(struct metadata MD, struct message msg, int frag)
 {
+	if(commonfunctions_checkCRC(msg) != 0)
+	{
+		//TODO
+		printf("ERROR: CRC not correct \n");
+		return;
+	}
 	FILE *fp;
 	fp = fopen(MD.name, "w");
 	fseek(fp, frag*MTU, SEEK_SET);
@@ -108,6 +116,11 @@ void message_decapsulation(struct metadata MD, struct message msg, int frag)
 
 struct metadata message_decapsulation_first(struct message msg)
 {
+	if(commonfunctions_checkCRC(msg) != 0)
+	{
+		//TODO
+		printf("ERROR: CRC not correct \n");
+	}
 	struct metadata file;
 	strcpy(file.name, msg.data);
 	return file;

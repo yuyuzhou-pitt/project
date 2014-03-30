@@ -2,6 +2,8 @@
 #define commonItemsHEADER	
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include "checksum.h"
 
 #define FILENAMESIZE 80
 
@@ -48,7 +50,8 @@
 	void commonItems_setEdgeRouter(int port, char IP[15]);
 	void commonItems_setTimeout(int time);
 	void commonItems_displaysettings();
-	
+	int commonfunctions_checkCRC(struct message msg);
+
 	extern int MTU;
 	extern int edge_Port;
 	extern char edge_IP[16];
