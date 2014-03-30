@@ -1,5 +1,7 @@
 #ifndef commonItemsHEADER
 #define commonItemsHEADER	
+#include <string.h>
+#include <stdio.h>
 
 #define FILENAMESIZE 80
 
@@ -29,8 +31,26 @@
 		struct message* data; 
 	};
 
+	struct packet
+	{
+		char router_ID[16];
+		char packet_type[3]; // data packets are 110
+		char src_IP[32];
+		char dest_IP[32];
+		char length[10];
+		struct data_segment* data; 
+		char packet_life[4];
+		char checksum[32]; 
+	};
+
+
 	void commonItems_setMTU(int MTU_temp);
+	void commonItems_setEdgeRouter(int port, char IP[15]);
+	void commonItems_setTimeout(int time);
+	void commonItems_displaysettings();
 	
 	extern int MTU;
-	extern int maxDataSize;
+	extern int edge_Port;
+	extern char edge_IP[16];
+	extern int timeout;
 #endif
