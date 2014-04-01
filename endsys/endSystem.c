@@ -3,6 +3,7 @@
 #include "app.h"
 #include "sw.h"
 #include "commonItems.h"
+#include "socket.h"
 
 void readcfgs()
 {
@@ -12,6 +13,8 @@ void readcfgs()
 
 int main( int argc, const char* argv[] )
 {
+	socket_getIP();
+	socket_rcvFile();
 	readcfgs();
 	printf("STARTUP: Config files have been read\n");
 
@@ -31,9 +34,14 @@ int main( int argc, const char* argv[] )
 
 			scanf ("%79s",filename); 
 			scanf ("%159s", IP_FILE);
-			IP = strtok(IP_FILE, ":");
-			FILE_DEST = strtok(NULL, ":");
-			app_sendFile( filename, FILE_DEST, IP);
+			if(commonfunctions_checkSetRouter() == -1)
+				printf("ERROR: Edge router not set\n");
+			else
+			{
+				IP = strtok(IP_FILE, ":");
+				FILE_DEST = strtok(NULL, ":");
+				app_outgoingFile( filename, FILE_DEST, IP);
+			}
 		}
 		else if(strstr(cmd,"set-edge-router"))
 		{
@@ -45,18 +53,8 @@ int main( int argc, const char* argv[] )
 			char IP_address[16];
 			memcpy(IP_address, IP, sizeof(IP_address));
 			commonItems_setEdgeRouter(port,IP_address);
-			printf("Server has been set up on this machine. \nPlease ensure all servers are setup. \nThen press 1 to continue to setup client:");
-			
-			int cont = 0;
-			scanf ("%d",&cont);
-			if(cont == 1)
-			{
-				//CALL SETUP CLIENT
-			}
-			else
-			{
-				printf("You have choosen not to continue. Server will be shutdown");
-			}
+
+			//CALL SETUP OF CLIENT
 		}
 		else if(strstr(cmd,"MTU"))
 		{

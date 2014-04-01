@@ -36,3 +36,21 @@ int commonfunctions_checkCRC(struct message msg)
 	else
 		return 0;
 }
+
+int commonfunctions_checkCRC_pkt(struct packet pck)
+{
+	unsigned int generated = chksum_crc32((unsigned char*) pck.data, atoi(pck.length));
+	unsigned int given = atoi(pck.checksum);
+	if(generated != given)
+		return -1;
+	else
+		return 0;
+}
+
+int commonfunctions_checkSetRouter()
+{
+	if(edge_IP == "000.000.000.000" || edge_Port == 0)
+		return -1;
+	else
+		return 0;
+}

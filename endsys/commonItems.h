@@ -51,6 +51,8 @@
 	void commonItems_setTimeout(int time);
 	void commonItems_displaysettings();
 	int commonfunctions_checkCRC(struct message msg);
+	int commonfunctions_checkCRC_pkt(struct packet pck);
+	int commonfunctions_checkSetRouter();
 
 	extern int MTU;
 	extern int edge_Port;

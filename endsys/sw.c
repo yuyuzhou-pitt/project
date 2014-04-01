@@ -37,9 +37,29 @@ int sw_getAppID()
 struct data_segment segment_encapsulation(struct message msg)
 {
 	struct data_segment ds;
+	ds.packet_type ='0';
+	snprintf(ds.app_id, sizeof(ds.app_id), "%d", sw_getAppID());
+	ds.sequence_number[0] ='0';
+	ds.sequence_number[1] ='0';
+	ds.sequence_number[2] ='1';
+	ds.data = &msg;
+	return ds;
 }
 
 struct message segment_decapsulation(struct data_segment ds)
 {
-
+	return *(ds.data);
 }
+
+void sw_outgoingmessage(struct message msg)
+{
+	struct data_segment ds = segment_encapsulation(msg);
+	lsrp_outgoingmessage(ds);
+}
+
+void sw_incomingmessage(struct data_segment ds)
+{
+	struct message msg = segment_decapsulation(ds);
+	app_incomingFile(msg);
+}
+
