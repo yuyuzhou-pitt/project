@@ -1,3 +1,7 @@
+/*
+ * Wrap of socket fuctions.
+*/
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <stdio.h>
@@ -71,11 +75,11 @@ int Accept(int sockfd, struct sockaddr_in sockaddr, int sin_size){
 /*wrap recvfrom*/
 int Recvfrom(int sockfd, char buff[], int size, int flag, struct sockaddr_in sockaddr, int sin_size){
     int recvbytes;
-    if ((recvbytes = recvfrom(sockfd,&buff, size, flag, (struct sockaddr *)&sockaddr, &sin_size)) < 0){
-        perror("recv");
+    if ((recvbytes = recvfrom(sockfd,buff, size, flag, (struct sockaddr *)&sockaddr, &sin_size)) < 0){
+        perror("recvfrom");
         exit(1);
     }    
-    printf("Received a message: msg=%s\n", &buff);
+    printf("Recvfrom message:%s\n", buff);
     return recvbytes;
 }
 
@@ -83,10 +87,32 @@ int Recvfrom(int sockfd, char buff[], int size, int flag, struct sockaddr_in soc
 int Sendto(int sockfd, char buf[], int buf_size, int flag, struct sockaddr_in sockaddr, int sin_size){
     int sendbytes;
     if ((sendbytes = sendto(sockfd, buf, buf_size, flag, (struct sockaddr *)&sockaddr, sin_size)) < 0){
+        perror("sendto");
+        exit(1);
+    }
+    printf("Sendto message :%s\n",buf);
+    return sendbytes;
+}
+
+/*wrap recv*/
+int Recv(int sockfd, char buff[], int size, int flag){
+    int recvbytes;
+    if ((recvbytes = recv(sockfd,buff, size, flag)) < 0){
+        perror("recv");
+        exit(1);
+    }
+    printf("Recv message: msg=%s\n", buff);
+    return recvbytes;
+}
+
+/*wrap send*/
+int Send(int sockfd, char buf[], int buf_size, int flag){
+    int sendbytes;
+    if ((sendbytes = send(sockfd, buf, buf_size, flag)) < 0){
         perror("send");
         exit(1);
     }
-    printf("send message :%s\n",buf);
+    printf("Send message :%s\n",buf);
     return sendbytes;
 }
 
