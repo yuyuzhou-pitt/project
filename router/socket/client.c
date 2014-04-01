@@ -1,3 +1,9 @@
+/* Demo of socket client.
+ * Compile and run:
+ * $ gcc -o client client.c libsocket.c
+ * $ ./client <server-ip> <server-port> "<message>"
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -41,10 +47,10 @@ int main(int argc, char *argv[]){
     strcpy(buff.group,argv[3]);
     //strcpy(buff.group,"bat001");
     /*send message, use sendto for udp connection*/
-    sendbytes = Sendto(sockfd,buff.group,sizeof(buff.group), 0, sockaddr,sizeof(sockaddr));
+    sendbytes = Send(sockfd,buff.group,sizeof(buff.group), 0);
     memset(buf,0,sizeof(buf));
     /*receive feedback*/
-    recvbytes = Recvfrom(sockfd,buf,sizeof(buf), 0, sockaddr,sizeof(sockaddr));
+    recvbytes = Recv(sockfd,buf,sizeof(buf), 0);
     //printf("Received a message : %s\n",buf);
     close(sockfd);
     exit(0);
