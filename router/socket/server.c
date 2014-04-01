@@ -1,3 +1,13 @@
+/* Demo of Multi-thread version socket.
+ *  - assign port automatically
+ *  - timeout after given time
+ *  - accept multi-client connection
+ *
+ * Compile and run:
+ * $ gcc -g -pthread -o server server.c libsocket.c
+ * ./server
+*/
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <stdio.h>
@@ -8,13 +18,49 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include <netinet/in.h>
+#include <pthread.h>
 #include "libsocket.h"
 
-#define PORT            0 //0 means assign a port randomly 4321
-#define BUFFER_SIZE        1024
+#define PORT 0 //0 means assign a port randomly
+#define BUFFER_SIZE  1024
 #define MAX_QUE_CONN_NM   5
-#define TIMER  30  /*Timeout value*/ 
+#define TIMER  3000  //Timeout value
 #define CONTINUE     1 
+#define NTHREADS 5
+
+pthread_t threadid[NTHREADS]; // Thread pool
+pthread_mutex_t lock;
+int counter = 0;
+
+void *sockthread(void *arg){
+
+    int sockfd; // File descriptor and 'read/write' to socket indicator
+    char buff[BUFFER_SIZE];
+    char buf[BUFFER_SIZE];
+    sockfd = (int) arg; // Getting sockfd from void arg passed in
+  
+    printf("here we are.\n");
+    /* Receive from the remote side */
+    memset(buff, 0, sizeof(buff));
+    Recv(sockfd,buff,sizeof(buff),0);
+    /* Send to the remote side */
+    memset(buf , 0, sizeof(buf));
+    strcpy(buf,"return to client");
+    Send(sockfd,buf, sizeof(buf),0);
+  
+    /* Critical section */
+    printf("Requesting mutex lock...\n");
+    pthread_mutex_lock (&lock);
+    printf("Current counter value: %d, upping by 1...\n", counter);
+    counter++;
+    pthread_mutex_unlock (&lock);
+    printf("Done! Mutex unlocked again, new counter value: %d\n", counter);
+  
+    close(sockfd);
+    printf("TID:0x%x served request, exiting thread\n", pthread_self());
+    pthread_exit(0);
+
+}
 
 int main(){
     struct sockaddr_in server_sockaddr, client_sockaddr;
@@ -40,6 +86,9 @@ int main(){
     int nready;
     int nbytes;
 
+    pthread_attr_t attr; // Thread attribute
+    int iThread = 0; // Thread iterator
+
     sockfd = Socket(AF_INET,SOCK_STREAM,0);
 
     /*set parameters for sockaddr_in*/
@@ -56,6 +105,11 @@ int main(){
     Getsockname(sockfd, server_sockaddr, sin_size);  /* Get the port number assigned*/
     Listen(sockfd, MAX_QUE_CONN_NM);
    
+    pthread_attr_init(&attr); // Creating thread attributes
+    pthread_attr_setschedpolicy(&attr, SCHED_FIFO); // FIFO scheduling for threads 
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED); // Don't want threads (particualrly main)
+                                                               // waiting on each other
+
     /*Set up the I/O for the socket, nonblocking*/
     maxfd = sockfd;
     FD_ZERO(&ready_set);
@@ -70,6 +124,10 @@ int main(){
     gettimeofday(&before, &tzp);
     status=CONTINUE;
     while (status==CONTINUE){
+        if (iThread == NTHREADS){
+            iThread = 0;
+        }
+
         memcpy(&ready_set, &test_set, sizeof(test_set));
         nready = select(maxfd+1, &ready_set, NULL, NULL, tvptr);
         switch(nready){
@@ -84,38 +142,17 @@ int main(){
                 status=-1;
                 break;
             default:
-                desc_ready = nready;
-                for (i=0; i <= maxfd  &&  desc_ready > 0; ++i){
-                    if (FD_ISSET(i, &ready_set)){
-                        desc_ready -= 1;
-
-                        if (i == sockfd){
-                            printf("  Listening socket is readable\n");
-                            //do{
-                                /* wait for connection */
-                                client_fd = Accept(sockfd, client_sockaddr, sin_size);
-                                FD_SET(client_fd, &test_set);
-                                if (client_fd > maxfd) maxfd = client_fd;
-                            //}while(client_fd != -1);
-
-                        }
-                        else{
-                            printf("  Descriptor %d is readable\n", i);
-         
-                            //do{
-                                my buff;
-				/* Receive from the remote side */
-				memset(buf , 0, sizeof(buf));
-                                Recvfrom(client_fd,buff.group,sizeof(buff.group),0,client_sockaddr, sin_size);
-                                /* Send to the remote side */
-                                memset(buf , 0, sizeof(buf));
-                                strcpy(buf,"return to client");
-                                Sendto(client_fd,buf, strlen(buf),0, client_sockaddr, sin_size);
-                                status=-1;
-                            //}while(1);
-                        }//end else
-                    }// end if (FD_ISSET(i, &ready_set))
-                }// end for
+                if (FD_ISSET(sockfd, &ready_set)){
+                    printf("  Listening socket is readable\n");
+                    /* wait for connection */
+                    client_fd = Accept(sockfd, client_sockaddr, sin_size);
+                    FD_SET(client_fd, &test_set);
+                    if (client_fd > maxfd) maxfd = client_fd;
+                    printf("  Descriptor %d is readable\n", i);
+ 
+                    pthread_create(&threadid[i++], &attr, &sockthread, (void *) client_fd);
+                    sleep(0); // Giving threads some CPU time
+                }// end if (FD_ISSET(i, &ready_set))
         }// end switch
     } // end while (status==CONTINUE)
     close(sockfd);
