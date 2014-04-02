@@ -16,5 +16,7 @@ int Sendto(int sockfd, char buf[], int buf_size, int flag, struct sockaddr_in so
 int Recv(int sockfd, char buff[], int size, int flags);
 int Send(int sockfd, char buf[], int buf_size, int flag);
 int Connect(int sockfd, struct sockaddr_in sockaddr, int sin_size);
+int writeFile(char *str, int size, char *file);
+int readFile(char *str, int size, char *file);
 
 #endif

@@ -18,7 +18,7 @@ int Socket(int family, int type, int protocal){
     int sockfd;
     if((sockfd = socket(family, type, protocal)) < 0){
         perror("socket");
-        exit(1);
+        return -1;
     }
     printf("Socket id = %d\n",sockfd);
 
@@ -30,7 +30,7 @@ int Bind(int sockfd, struct sockaddr_in sockaddr){
     int n;
     if((n = bind(sockfd, (struct sockaddr *)&sockaddr, sizeof(struct sockaddr))) < 0){
         perror("bind");
-        exit(1);
+        return -1;
     }
     printf("Bind success!\n");
 
@@ -42,10 +42,11 @@ int Getsockname(int sockfd, struct sockaddr_in sockaddr, int sin_size){
     int n, port;
     if((n = getsockname(sockfd, (struct sockaddr *)&sockaddr,&sin_size)) < 0){
         perror("getsockname");
-        exit(1);
+        return -1;
     }
+    
     port = ntohs(sockaddr.sin_port);
-    printf("socket has port %d\n",port); /* Display port number */
+    printf("socket has port %d\n", port); /* Display port number */
 
     return port;
 }
@@ -55,18 +56,18 @@ int Listen(int sockfd, int max_que_comm_nm){
     int n;
     if((n = listen(sockfd, max_que_comm_nm) < 0)){
          perror("listen");
-         exit(1);
+         return -1;
     }
     printf("Listening....\n");
     return n;
 }
-   
+
 /*wrap accept*/
 int Accept(int sockfd, struct sockaddr_in sockaddr, int sin_size){
     int client_fd;
     if ((client_fd = accept(sockfd,(struct sockaddr *)&sockaddr, &sin_size)) < 0){
         perror("accept");
-        exit(1);
+        return -1;
     }
     printf("New incoming connection - %d\n", client_fd);
     return client_fd;
@@ -77,9 +78,9 @@ int Recvfrom(int sockfd, char buff[], int size, int flag, struct sockaddr_in soc
     int recvbytes;
     if ((recvbytes = recvfrom(sockfd,buff, size, flag, (struct sockaddr *)&sockaddr, &sin_size)) < 0){
         perror("recvfrom");
-        exit(1);
+        return -1;
     }    
-    printf("Recvfrom message:%s\n", buff);
+    printf("Recvfrom message: %s\n", buff);
     return recvbytes;
 }
 
@@ -88,9 +89,9 @@ int Sendto(int sockfd, char buf[], int buf_size, int flag, struct sockaddr_in so
     int sendbytes;
     if ((sendbytes = sendto(sockfd, buf, buf_size, flag, (struct sockaddr *)&sockaddr, sin_size)) < 0){
         perror("sendto");
-        exit(1);
+        return -1;
     }
-    printf("Sendto message :%s\n",buf);
+    printf("Sendto message: %s\n",buf);
     return sendbytes;
 }
 
@@ -99,9 +100,9 @@ int Recv(int sockfd, char buff[], int size, int flag){
     int recvbytes;
     if ((recvbytes = recv(sockfd,buff, size, flag)) < 0){
         perror("recv");
-        exit(1);
+        return -1;
     }
-    printf("Recv message: msg=%s\n", buff);
+    printf("Recv message: %s\n", buff);
     return recvbytes;
 }
 
@@ -110,9 +111,9 @@ int Send(int sockfd, char buf[], int buf_size, int flag){
     int sendbytes;
     if ((sendbytes = send(sockfd, buf, buf_size, flag)) < 0){
         perror("send");
-        exit(1);
+        return -1;
     }
-    printf("Send message :%s\n",buf);
+    printf("Send message: %s\n",buf);
     return sendbytes;
 }
 
@@ -132,7 +133,65 @@ int Connect(int sockfd, struct sockaddr_in sockaddr, int sin_size){
     int n;
     if((n = connect(sockfd,(struct sockaddr *)&sockaddr,sin_size)) < 0){
         perror("connect");
-        exit(1);
+        return -1;
     }
     return n;
+}
+
+/*write port to file*/
+int writeFile(char *str, int size, char *file){
+    FILE *fp;
+    if((fp=fopen(file, "w"))<0){
+        printf("Failed to open file %s.", file);
+        return -1;
+    }
+
+    if((fwrite(str, 1, size, fp))<0){
+        printf("Failed to write file %s.", file);
+        return -1;
+    }
+    fclose(fp);
+
+    return 0;
+}
+
+/*read port from file*/
+int readFile(char *str, int size, char *file){
+    FILE *fp;
+
+    if(access(file, F_OK) < 0) {
+        printf("readfile: File not found: %s\n", file);
+        return -1;
+    }
+
+    if((fp=fopen(file, "r"))<0){
+        printf("Failed to open file: %s\n", file);
+        return -1;
+    }
+
+    if((fgets(str, size, fp))<0){
+        printf("Failed to read file: %s\n", file);
+        return -1;
+    }
+ 
+    fclose(fp);
+
+    return 0;
+}
+
+/*get port from host file*/
+int getPort(char *portstr, char *hostip){
+    char hostfile[17];
+    memset(hostfile, 0, sizeof(hostfile));
+    int size = 6;
+    strcpy(hostfile, ".");
+    strcat(hostfile, hostip);
+
+    if(readFile(portstr, size, hostfile) < 0){
+        perror("getport");
+        return -1;
+    }
+    printf("port on %s is: %s\n", hostip, portstr);
+
+    return 0;
 }
