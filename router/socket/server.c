@@ -20,6 +20,7 @@
 #include <netinet/in.h>
 #include <pthread.h>
 #include "libsocket.h"
+#include "getaddrinfo.h"
 
 #define PORT 0 //0 means assign a port randomly
 #define BUFFER_SIZE  1024
@@ -33,17 +34,25 @@ pthread_t threadid[NTHREADS]; // Thread pool
 pthread_mutex_t lock;
 int counter = 0;
 
+/*thread for new client connection, arg is the client_fd*/
 void *sockthread(void *arg){
 
     int sockfd; // File descriptor and 'read/write' to socket indicator
+    sockfd = (int) arg; // Getting sockfd from void arg passed in
+
     char buff[BUFFER_SIZE];
     char buf[BUFFER_SIZE];
-    sockfd = (int) arg; // Getting sockfd from void arg passed in
-  
+    //neighbor_acq_msg *neighbor_req, *neighbor_cfm, *neighbor_rfs, *cease_req, *cease_cfm;
+    
     /* Receive from the remote side */
     memset(buff, 0, sizeof(buff));
     Recv(sockfd,buff,sizeof(buff),0);
+    //Recv(sockfd,neighbor_req,sizeof(neighbor_req),0);
 
+    //neighbor_cfm = genCfm(neighbor_req);
+
+    /* confiem the request */
+    //if(neighbor_cfm.NeighborAcqType == 1)
     /* Send to the remote side */
     memset(buf , 0, sizeof(buf));
     strcpy(buf,"return to client");
@@ -92,11 +101,11 @@ int main(){
     Bind(sockfd, server_sockaddr);
 
     int port;
-    char str[6];
-    char *portfile = ".136.142.227.15";
+    char str[6], hostname[1024], addrstr[100];
+    getaddr(hostname, addrstr); //get hostname and ip
     port = Getsockname(sockfd, server_sockaddr, sin_size);  /* Get the port number assigned*/
-    sprintf(str, "%d", port);
-    writeFile(str, sizeof(str), portfile);
+    sprintf(str, "%d", port); // int to str
+    writePort(str, addrstr);
     
     Listen(sockfd, MAX_QUE_CONN_NM);
    
@@ -156,6 +165,6 @@ int main(){
         }// end switch
     } // end while (status==CONTINUE)
     close(sockfd);
-    unlink(portfile);
+    unlinkPortFile(addrstr);
     exit(0);
 }

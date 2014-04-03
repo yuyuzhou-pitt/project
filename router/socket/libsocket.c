@@ -138,7 +138,7 @@ int Connect(int sockfd, struct sockaddr_in sockaddr, int sin_size){
     return n;
 }
 
-/*write port to file*/
+/*write file*/
 int writeFile(char *str, int size, char *file){
     FILE *fp;
     if((fp=fopen(file, "w"))<0){
@@ -155,7 +155,7 @@ int writeFile(char *str, int size, char *file){
     return 0;
 }
 
-/*read port from file*/
+/*read file*/
 int readFile(char *str, int size, char *file){
     FILE *fp;
 
@@ -179,19 +179,51 @@ int readFile(char *str, int size, char *file){
     return 0;
 }
 
-/*get port from host file*/
-int getPort(char *portstr, char *hostip){
+/*unlink port file*/
+int unlinkPortFile(char *file){
+    char hostfile[17];
+    memset(hostfile, 0, sizeof(hostfile));
+    strcpy(hostfile, ".");
+    strcat(hostfile, file);
+
+    if(unlink(hostfile) < 0){
+        perror("unlinkPortFile");
+        return -1;
+    }
+    
+    return 0;
+}
+
+/*write port to host file*/
+int writePort(char *portstr, char *hostip){
     char hostfile[17];
     memset(hostfile, 0, sizeof(hostfile));
     int size = 6;
     strcpy(hostfile, ".");
     strcat(hostfile, hostip);
 
+    if(writeFile(portstr, size, hostfile) < 0){
+        perror("writeport");
+        return -1;
+    }
+    printf("write port %s to file: %s\n", portstr, hostfile);
+
+    return 0;
+}
+
+/*get port from host file*/
+int getPort(char *portstr, char *ipfile){
+    char hostfile[17];
+    memset(hostfile, 0, sizeof(hostfile));
+    int size = 6;
+    strcpy(hostfile, ".");
+    strcat(hostfile, ipfile);
+
     if(readFile(portstr, size, hostfile) < 0){
         perror("getport");
         return -1;
     }
-    printf("port on %s is: %s\n", hostip, portstr);
+    printf("port on %s is: %s\n", ipfile, portstr);
 
     return 0;
 }
