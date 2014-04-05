@@ -11,7 +11,7 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 #include <netinet/in.h>
-#include "libsocket.h"
+#include "../packet/packet.h"
 
 /*wrap socket*/
 int Socket(int family, int type, int protocal){
@@ -74,46 +74,46 @@ int Accept(int sockfd, struct sockaddr_in sockaddr, int sin_size){
 }
 
 /*wrap recvfrom*/
-int Recvfrom(int sockfd, char buff[], int size, int flag, struct sockaddr_in sockaddr, int sin_size){
+int Recvfrom(int sockfd, Packet *packet, int size, int flag, struct sockaddr_in sockaddr, int sin_size){
     int recvbytes;
-    if ((recvbytes = recvfrom(sockfd,buff, size, flag, (struct sockaddr *)&sockaddr, &sin_size)) < 0){
+    if ((recvbytes = recvfrom(sockfd, packet, size, flag, (struct sockaddr *)&sockaddr, &sin_size)) < 0){
         perror("recvfrom");
         return -1;
     }    
-    printf("Recvfrom message: %s\n", buff);
+    printf("Recvfrom message: %s\n", packet);
     return recvbytes;
 }
 
 /*wrap sendto*/
-int Sendto(int sockfd, char buf[], int buf_size, int flag, struct sockaddr_in sockaddr, int sin_size){
+int Sendto(int sockfd, Packet *packet, int size, int flag, struct sockaddr_in sockaddr, int sin_size){
     int sendbytes;
-    if ((sendbytes = sendto(sockfd, buf, buf_size, flag, (struct sockaddr *)&sockaddr, sin_size)) < 0){
+    if ((sendbytes = sendto(sockfd, packet, size, flag, (struct sockaddr *)&sockaddr, sin_size)) < 0){
         perror("sendto");
         return -1;
     }
-    printf("Sendto message: %s\n",buf);
+    printf("Sendto message: %s\n", packet);
     return sendbytes;
 }
 
 /*wrap recv*/
-int Recv(int sockfd, char buff[], int size, int flag){
+int Recv(int sockfd, Packet *packet, int size, int flag){
     int recvbytes;
-    if ((recvbytes = recv(sockfd,buff, size, flag)) < 0){
+    if ((recvbytes = recv(sockfd, packet, size, flag)) < 0){
         perror("recv");
         return -1;
     }
-    printf("Recv message: %s\n", buff);
+    printf("Recv message from: %s\n", packet->RouterID);
     return recvbytes;
 }
 
 /*wrap send*/
-int Send(int sockfd, char buf[], int buf_size, int flag){
+int Send(int sockfd, Packet *packet, int size, int flag){
     int sendbytes;
-    if ((sendbytes = send(sockfd, buf, buf_size, flag)) < 0){
+    if ((sendbytes = send(sockfd, packet, size, flag)) < 0){
         perror("send");
         return -1;
     }
-    printf("Send message: %s\n",buf);
+    printf("Send message: %s\n",packet->RouterID);
     return sendbytes;
 }
 
@@ -141,17 +141,17 @@ int Connect(int sockfd, struct sockaddr_in sockaddr, int sin_size){
 /*write file*/
 int writeFile(char *str, int size, char *file){
     FILE *fp;
-    if((fp=fopen(file, "w"))<0){
-        printf("Failed to open file %s.", file);
-        return -1;
+    if ((fp = fopen(file,"w")) < 0){
+        printf("writefile: Failed to open file: %s\n", file);
+        return;
     }
 
     if((fwrite(str, 1, size, fp))<0){
-        printf("Failed to write file %s.", file);
+        printf("writefile: Failed to write file %s.", file);
         return -1;
     }
-    fclose(fp);
 
+    fclose(fp);
     return 0;
 }
 
@@ -164,16 +164,16 @@ int readFile(char *str, int size, char *file){
         return -1;
     }
 
-    if((fp=fopen(file, "r"))<0){
-        printf("Failed to open file: %s\n", file);
-        return -1;
+    if ((fp = fopen(file,"r")) < 0){
+        printf("readfile: Failed to open file: %s\n", file);
+        return;
     }
 
     if((fgets(str, size, fp))<0){
-        printf("Failed to read file: %s\n", file);
+        printf("readfile: Failed to read file: %s\n", file);
         return -1;
     }
- 
+
     fclose(fp);
 
     return 0;
@@ -187,22 +187,26 @@ int unlinkPortFile(char *file){
     strcat(hostfile, file);
 
     if(unlink(hostfile) < 0){
-        perror("unlinkPortFile");
+        printf("Failed to unlink file: %s \n", file);
         return -1;
     }
-    
+
     return 0;
 }
 
 /*write port to host file*/
-int writePort(char *portstr, char *hostip){
+int writePort(int port, char *hostip){
+
+    char portstr[6];
+    sprintf(portstr, "%d", port); // int to str
+
     char hostfile[17];
     memset(hostfile, 0, sizeof(hostfile));
-    int size = 6;
+
     strcpy(hostfile, ".");
     strcat(hostfile, hostip);
 
-    if(writeFile(portstr, size, hostfile) < 0){
+    if(writeFile(portstr, sizeof(portstr), hostfile) < 0){
         perror("writeport");
         return -1;
     }
