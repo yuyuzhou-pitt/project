@@ -136,13 +136,12 @@ void cfgwrite(char filename[], char parameter[], char content[])
     fclose(tempfile);
 }
 
-
-
-
+/*
 void main()
 {
 // cfgread("lsrp-router.cfg","link_cost_method",j);
 // printf("%s",j);
    cfgwrite("lsrp-router.cfg","eth_0_id","10.66.10.3");
 }
+*/
 
