@@ -10,11 +10,7 @@ typedef struct Neighbors_Acquisiton_Message{
 }Neighbor_Msg;
 
 typedef struct Hello_Message{
-    char NeighborAcqType[4]; // 0~4
-    char PortID[32];
-    char HelloInterval[4]; // for alive, default 40s
-    char UpdateInterval[4]; // for LSA update, default
-    char ProtocolVersion[4]; // routers with different version should not be neighbors
+    char Hello; // hello message, value is always '1'
 }Hello_Msg;
 
 typedef struct  Link_State_Advertisement_Message{
@@ -46,7 +42,7 @@ typedef struct Packet{
 #elif PING
     Ping_Msg Data; //34 + len(data)
 #else
-    LSA_Msg Data;
+    Neighbor_Msg Data; // default as Neighbor_Msg, which is the first message to exchange
 #endif
     char PacketChecksum[32]; // crc32
 }Packet;
