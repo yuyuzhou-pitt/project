@@ -22,6 +22,7 @@
 #include "socket/libsocket.h"
 #include "socket/getaddrinfo.h"
 #include "packet/neighbor.h"
+#include "packet/hello.h"
 #include "config/config.h"
 
 #define PORT 0 //0 means assign a port randomly
@@ -63,6 +64,16 @@ void *sockthread(void *arg){
     Send(sockfd, neighbor_reply, sizeof(*neighbor_reply), 0);
 
     printf("reply type: %s\n", neighbor_reply->Data.NeighborAcqType);
+
+    /* if neighbor request confirmed:
+     * 1) exchange alive (hello) message in HelloInterval seconds
+     * 2) exchange LSA message in UpdateInterval seconds, or every time there is updates
+     *     */
+
+    pthread_t hellothreadid;
+    if(neighbor_reply->Data.NeighborAcqType == "001"){
+        pthread_create(&hellothreadid, NULL, &hellothread, (void *) sockfd);
+    }
 
     /* Critical section */
     pthread_mutex_lock (&lock);
