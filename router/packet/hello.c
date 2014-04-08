@@ -2,24 +2,24 @@
 #include <string.h>
 #include <stdlib.h>
 #include "../../endsys/checksum.h"
+#include "../config/config.h"
 
 #define HELLO 1
 #include "packet.h"
 
-#include "../packet/hello.h"
+#define LSRPINPACKET "config/lsrp-router.cfg"
 
-Packet *genHelloReq(){
+Packet *genHelloReq(Router *router){
     /*generate hello message*/
-    char *filename = "../config/lsrp-router.cfg";
 
     Hello_Msg hello_msg;
-    hello_msg.Hello = '1'; // the only data in Hello Message
+    hello_msg.Hello = 1; // the only data in Hello Message
 
     /*wrap into packet*/
     Packet *hello_packet;
     hello_packet = (Packet *)malloc(sizeof(Packet)); //Packet with Hello_Msg type Data
 
-    cfgread(filename, "router_id", hello_packet->RouterID); // RouterID, read from cfg file
+    snprintf(hello_packet->RouterID, sizeof(hello_packet->RouterID), "%s", router->router_id);
     snprintf(hello_packet->PacketType, sizeof(hello_packet->PacketType), "%s", "001"); // Hello Packets (001)
 
     hello_packet->Data = (Hello_Msg) hello_msg; // Data
@@ -31,15 +31,13 @@ Packet *genHelloReq(){
 }
 
 /*thread for hello message thread, arg is the client_fd*/
-void *hellothread(void *arg){
+void *helloserver(void *arg){
 
     int sockfd; // File descriptor and 'read/write' to socket indicator
     sockfd = (int) arg; // Getting sockfd from void arg passed in
 
-    /*get hello interval*/
-    char *filename = "../config/lsrp-router.cfg";
-    char hello_interval[4];
-    cfgread(filename, "hello_interval", hello_interval); // read hello interval from cfg file
+    Router *router;
+    router = getRouter(LSRPINPACKET); // get router configuration from cfg file
 
     Packet *hello_req, *hello_reply; // MUST use pointer to fit different Packet
 
@@ -48,19 +46,17 @@ void *hellothread(void *arg){
         /* Receive hellos_req from remote side */
         hello_req = (Packet *)malloc(sizeof(Packet));
         Recv(sockfd, hello_req, sizeof(Packet), 0);
-        alive = atoi(&(hello_req->Data.Hello)); // set alive from hello_req
+        alive = hello_req->Data.Hello; // set alive from hello_req
 
-        if(alive == 1){
-            /* generate hellos_reply reply according to configure file */
-            hello_reply = genHelloReq(); // msg to be sent back
-            Send(sockfd, hello_reply, sizeof(Packet), 0);
+        printf("helloserver: got alive message: %d.\n", alive);
 
-            /* enter into next round after interval */
-            sleep(atoi(hello_interval)); // hello_interval, default is 40s
-        }
-        else{
-            perror("hellothread");
-        }
+        /* generate hellos_reply reply according to configure file */
+        hello_reply = genHelloReq(router); // msg to be sent back
+        Send(sockfd, hello_reply, sizeof(Packet), 0);
+
+        /* enter into next round after interval */
+        printf("helloserver: sleep for %d seconds...\n", router->hello_interval);
+        sleep(router->hello_interval); // hello_interval, default is 40s
     }
 
     close(sockfd);
@@ -68,3 +64,36 @@ void *hellothread(void *arg){
     pthread_exit(0);
 }
 
+/*thread for hello message thread, arg is the client_fd*/
+void *helloclient(void *arg){
+    int sockfd; // File descriptor and 'read/write' to socket indicator
+    sockfd = (int) arg; // Getting sockfd from void arg passed in
+
+    Router *router;
+    router = getRouter(LSRPINPACKET); // get router configuration from cfg file
+
+    Packet *hello_req, *hello_reply; // MUST use pointer to fit different Packet
+
+    int alive = 1;
+    while(alive == 1){
+        /* generate hellos_reply reply according to configure file */
+        hello_req = genHelloReq(router); // msg to be sent back
+        Send(sockfd, hello_req, sizeof(Packet), 0);
+        printf("helloclient: Hello packet sent.\n");
+
+        /* Receive hellos_req from remote side */
+        hello_reply = (Packet *)malloc(sizeof(Packet));
+        Recv(sockfd, hello_reply, sizeof(Packet), 0);
+
+        alive = hello_reply->Data.Hello; // set alive from hello_req
+        printf("helloclient: got alive message: %d.\n", alive);
+
+        /* enter into next round after interval */
+        printf("helloclient: sleep for %d seconds...\n", router->hello_interval);
+        sleep(router->hello_interval); // hello_interval, default is 40s
+    }
+
+    close(sockfd);
+    printf("TID:0x%x served request, exiting thread\n", pthread_self());
+    pthread_exit(0);
+}
