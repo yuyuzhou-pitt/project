@@ -11,6 +11,7 @@ eth0_ip and eth0_ip_direct can not be used at the same time.
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
+#include<unistd.h>
 #include"libfile.h"
 #include"config.h"
 
@@ -19,6 +20,11 @@ Router *getRouter(char *filename){
     char *line = NULL;
     size_t len = 0;
     ssize_t read;
+
+    if(access(filename, F_OK) < 0) {
+        printf("getRouter: File not found: %s\n", filename);
+        return -1;
+    }
 
     if ((fp = fopen(filename,"rt"))<0){
         printf("getRouter: Faile to open file: %s \n", filename);
@@ -96,7 +102,7 @@ Router *getRouter(char *filename){
 }
 
 int writeRouter(char *filename, Router *router){
-    copyFile(filename, LSRPCFGBK);
+    copyFile(filename, "lsrp-router.cfg.bk");
 
     FILE *fp;
 
@@ -278,14 +284,15 @@ void cfgwrite(char filename[], char parameter[], char content[])
 }
 
 /*
-void main()
+int main()
 {
 //  cfgread("lsrp-router.cfg","link_cost_method",j);
 //  printf("%s",j);
 //  cfgwrite("lsrp-router.cfg","eth_0_id","10.66.10.3");
 
     Router *router;
-    router = getRouter("lsrp-router.cfg");
-    writeRouter("lsrp-router.cfg", router);
+    router = getRouter();
+    writeRouter(router);
+    return 0;
 }
 */

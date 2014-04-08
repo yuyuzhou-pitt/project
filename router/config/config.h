@@ -1,8 +1,6 @@
 #ifndef __CONFIG_H__
 #define __CONFIG_H__
 
-#define LSRPCFG "lsrp-router.cfg"
-#define LSRPCFGBK "lsrp-router.cfg.bk"
 #define ETHX 2 //define interfaces number
 
 char i[80];
