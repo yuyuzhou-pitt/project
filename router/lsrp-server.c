@@ -31,6 +31,7 @@
 #define TIMER 1000  //Timeout value in seconds
 #define CONTINUE 1 
 #define NTHREADS 5
+#define LSRPCFG "config/lsrp-router.cfg"
 
 pthread_t threadid[NTHREADS]; // Thread pool
 pthread_mutex_t lock;
@@ -47,33 +48,42 @@ void *sockthread(void *arg){
     int sockfd; // File descriptor and 'read/write' to socket indicator
     sockfd = (int) arg; // Getting sockfd from void arg passed in
 
+    Router *router;
+    router = getRouter(LSRPCFG);
     /* There are 5 types of Neighbor Acquisition Packets.
      * Neighbor Acquisition Type:
      * neighbor_req: Be_Neighbors_Request(000) or Cease_Neighbors_Request(100)
      * neighbor_reply: Be_Neighbors_Confirm(101), Be_Neighbors_Refuse(111),
      *                 or Cease_Neighbors_Confirm(101)   */ 
     Packet *neighbor_req, *neighbor_reply; // MUST use pointer to fit different Packet
-    neighbor_reply = genNeighborReq(LSRPCFG, addrstr, port); // msg to be sent back
     
     /* Receive neighbors_req from remote side */
-    neighbor_req = (Packet *)malloc(sizeof(*neighbor_reply));
-    Recv(sockfd, neighbor_req, sizeof(*neighbor_req), 0);
+    neighbor_req = (Packet *)malloc(sizeof(Packet));
+    Recv(sockfd, neighbor_req, sizeof(Packet), 0);
 
     /* generate neighbors_reply reply according to configure file */
-    genNeighborReply(LSRPCFG, neighbor_req, neighbor_reply); // update the Neighbor Acquisition Type
-    Send(sockfd, neighbor_reply, sizeof(*neighbor_reply), 0);
+    neighbor_reply = genNeighborReq(router, addrstr, port); // msg to be sent back
+    genNeighborReply(router, neighbor_req, neighbor_reply); // update the Neighbor Acquisition Type
+    Send(sockfd, neighbor_reply, sizeof(Packet), 0);
 
-    printf("reply type: %s\n", neighbor_reply->Data.NeighborAcqType);
+    printf("sockthread: reply neighbor acq type: %s\n", neighbor_reply->Data.NeighborAcqType);
 
     /* if neighbor request confirmed:
      * 1) exchange alive (hello) message in HelloInterval seconds
      * 2) exchange LSA message in UpdateInterval seconds, or every time there is updates
      *     */
 
-    pthread_t hellothreadid;
-    if(neighbor_reply->Data.NeighborAcqType == "001"){
-        pthread_create(&hellothreadid, NULL, &hellothread, (void *) sockfd);
+    if(strcmp(neighbor_reply->Data.NeighborAcqType, "001") == 0){
+        /* use a thread to keep alive */
+        pthread_t hellothreadid;
+        pthread_create(&hellothreadid, NULL, &helloserver, (void *) sockfd);
+
+        /* use another thread for LSA */
+        //pthread_t LSAthreadid;
+        //pthread_create(&LSAthreadid, NULL, &LSAserver, (void *) sockfd);
     }
+
+    sleep(3600);
 
     /* Critical section */
     pthread_mutex_lock (&lock);
