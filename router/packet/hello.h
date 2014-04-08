@@ -3,8 +3,10 @@
 
 #define HELLO 1
 #include "packet.h"
+#include "../config/config.h"
 
-Packet *genHelloReq();
-void *hellothread(void *arg);
+Packet *genHelloReq(Router *router);
+void *helloserver(void *arg);
+void *helloclient(void *arg);
 
 #endif
