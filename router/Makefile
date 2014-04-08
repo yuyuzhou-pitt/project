@@ -6,10 +6,10 @@ CC = gcc
 all:lsrp-server lsrp-client
 
 lsrp-server:
-	${CC} -g -pthread -o lsrp-server lsrp-server.c socket/libsocket.c socket/getaddrinfo.c packet/neighbor.c packet/hello.c config/config.c ../endsys/checksum.c
+	${CC} -g -pthread -o lsrp-server lsrp-server.c socket/libsocket.c socket/getaddrinfo.c packet/neighbor.c packet/hello.c config/config.c config/libfile.c ../endsys/checksum.c
 
 lsrp-client:
-	${CC} -g -pthread -o lsrp-client lsrp-client.c socket/libsocket.c socket/getaddrinfo.c packet/neighbor.c packet/hello.c config/config.c ../endsys/checksum.c
+	${CC} -g -pthread -o lsrp-client lsrp-client.c socket/libsocket.c socket/getaddrinfo.c packet/neighbor.c packet/hello.c config/config.c config/libfile.c ../endsys/checksum.c
 
 clean:
 	rm lsrp-server lsrp-client
