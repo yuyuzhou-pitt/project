@@ -1,26 +1,27 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include "../config/config.h"
 #include "../../endsys/checksum.h"
 
 #define NEIGHBOR 1
 #include "packet.h"
 
-
-Packet *genNeighborReq(char *filename, char *hostip, int port){
+Packet *genNeighborReq(Router *router, char *hostip, int port){
     /*generate neighbor message*/
-    Neighbor_Msg neighbor_msg;
+    Neighbor_Msg neighbor_msg; // MUST not be pointer as to be send remote
     //Neighbor_Msg *neighbor_req;
     //neighbor_req = (Neighbor_Msg *)malloc(sizeof(neighbor_req));
 
     snprintf(neighbor_msg.NeighborAcqType, sizeof(neighbor_msg.NeighborAcqType), "%s", "000"); // Be_Neighbors_Request(000)
     snprintf(neighbor_msg.PortID, sizeof(neighbor_msg.PortID), "%d", port);
-    cfgread(filename, "ls_updated_interval", neighbor_msg.HelloInterval);
-    cfgread(filename, "protocol_version", neighbor_msg.ProtocolVersion);
+    neighbor_msg.HelloInterval = router->hello_interval;
+    neighbor_msg.UpdateInterval = router->ls_updated_interval;
+    snprintf(neighbor_msg.ProtocolVersion, sizeof(neighbor_msg.ProtocolVersion), "%s", router->protocol_version);
 
     /*wrap into packet*/
     //Packet neighbor_packet;
-    Packet *neighbor_packet;
+    Packet *neighbor_packet; // could be return as a pointer
     neighbor_packet = (Packet *)malloc(sizeof(Packet)); //Packet with Neighbor_Msg type Data
 
     snprintf(neighbor_packet->RouterID, sizeof(neighbor_packet->RouterID), "%s", hostip); // RouterID, use host ip as RouterID
@@ -33,23 +34,15 @@ Packet *genNeighborReq(char *filename, char *hostip, int port){
     return neighbor_packet;
 }
 
-int genNeighborReply(char *filename, Packet *neighbor_req, Packet *neighbor_reply){
-    char interface_num[4];
-    Neighbor_Msg neighbor_rep = neighbor_reply->Data;
+int genNeighborReply(Router *router, Packet *neighbor_req, Packet *neighbor_reply){
+    snprintf(neighbor_reply->Data.NeighborAcqType, sizeof(neighbor_reply->Data.NeighborAcqType), "%s", "111"); // default is Be_Neighbors_Refuse (111)
 
-    snprintf(neighbor_rep.NeighborAcqType, sizeof(neighbor_rep.NeighborAcqType), "%s", "111"); // default is Be_Neighbors_Refuse (111)
-
-    cfgread(filename, "num_of_interface", interface_num); // got the interface number
     /*send confirm if remote ip (RouteID) is in one of the direct link*/
     int i;
-    for(i=0;i<atoi(interface_num);i++){
-        char eth_x_direct_link_addr[32];
-        char direct_link_addr[32];
-        sprintf(eth_x_direct_link_addr, "eth_%d_direct_link_addr", i);
-        cfgread(filename, eth_x_direct_link_addr, direct_link_addr);
-        if (direct_link_addr == neighbor_req->RouterID){
+    for(i=0;i<ETHX;i++){ // ETHX defined in packet.h as interfaces number
+        if (strcmp(router->ethx[i].direct_link_addr, neighbor_req->RouterID) == 0){
             /*send confirm if req router_id is one of the direct link*/
-            snprintf(neighbor_rep.NeighborAcqType, sizeof(neighbor_rep.NeighborAcqType), "%s", "001"); // Be_Neighbors_Confirm (001)
+            snprintf(neighbor_reply->Data.NeighborAcqType, sizeof(neighbor_reply->Data.NeighborAcqType), "%s", "001"); // Be_Neighbors_Confirm (001)
             break;
         }
     }
