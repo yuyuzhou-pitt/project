@@ -14,10 +14,12 @@
 #include <sys/socket.h>
 #include "socket/libsocket.h"
 #include "packet/neighbor.h"
+#include "packet/hello.h"
 #include "config/config.h"
 
 #define PORT   0 //4321
 #define BUFFER_SIZE 1024
+#define LSRPCFG "config/lsrp-router.cfg"
 
 char hostname[1024]; // local hostname and domain
 char addrstr[100]; // local ip address (eth0)
@@ -58,6 +60,8 @@ int main(int argc, char *argv[]){
     /*connect to server*/
     Connect(sockfd,sockaddr,sizeof(sockaddr));
 
+    Router *router;
+    router = getRouter(LSRPCFG);
     /* There are 5 types of Neighbor Acquisition Packets.
      * Neighbor Acquisition Type:
      * neighbor_req: Be_Neighbors_Request(000) or Cease_Neighbors_Request(100)
@@ -66,26 +70,19 @@ int main(int argc, char *argv[]){
     Packet *neighbor_req, *neighbor_reply;
 
     /* generate neighbors_req according to configure file */
-    neighbor_req = genNeighborReq(LSRPCFG, addrstr, atoi(portstr)); // msg to be sent out
-    Send(sockfd, neighbor_req, sizeof(*neighbor_req), 0);
+    neighbor_req = genNeighborReq(router, addrstr, atoi(portstr)); // msg to be sent out
+    Send(sockfd, neighbor_req, sizeof(Packet), 0);
 
-    neighbor_reply = (Packet *)malloc(sizeof(*neighbor_req));
+    neighbor_reply = (Packet *)malloc(sizeof(Packet));
     /* Receive neighbors_reply from remote side */
-    Recv(sockfd, neighbor_reply, sizeof(*neighbor_reply), 0);
+    Recv(sockfd, neighbor_reply, sizeof(Packet), 0);
 
-    /*send message*/
-    /*memset(buff, 0, sizeof(buff));
-    strcpy(buff,argv[2]);
-    sendbytes = Send(sockfd,buff,sizeof(buff), 0);
-    */
+    if(strcmp(neighbor_reply->Data.NeighborAcqType, "001") == 0){
+        pthread_t hellothreadid;
+        pthread_create(&hellothreadid, NULL, &helloclient, (void *) sockfd);
+    }
 
-    /*receive feedback*/
-    /*
-    memset(buf,0,sizeof(buf));
-    recvbytes = Recv(sockfd,buf,sizeof(buf), 0);
-    */
-
-    //sleep(3600);
+    sleep(3600);
     close(sockfd);
     exit(0);
 }
