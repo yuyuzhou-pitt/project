@@ -4,13 +4,13 @@
 typedef struct Neighbors_Acquisiton_Message{
     char NeighborAcqType[4]; // 0~4
     char PortID[32];
-    char HelloInterval[4]; // for alive, default 40s
-    char UpdateInterval[4]; // for LSA update, default
+    int HelloInterval; // for alive, default 40s
+    int UpdateInterval; // for LSA update, default
     char ProtocolVersion[4]; // routers with different version should not be neighbors
 }Neighbor_Msg;
 
 typedef struct Hello_Message{
-    char Hello; // hello message, value is always '1'
+    int Hello; // hello message, value is always '1'
 }Hello_Msg;
 
 typedef struct  Link_State_Advertisement_Message{
