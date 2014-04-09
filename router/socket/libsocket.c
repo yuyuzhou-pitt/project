@@ -12,6 +12,7 @@
 #include <unistd.h>
 #include <netinet/in.h>
 #include "../packet/packet.h"
+#include "../config/liblog.h"
 
 /*wrap socket*/
 int Socket(int family, int type, int protocal){
@@ -20,7 +21,8 @@ int Socket(int family, int type, int protocal){
         perror("socket");
         return -1;
     }
-    printf("Socket id = %d\n",sockfd);
+    char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "Socket id = %d\n",sockfd);
+    logging(LOGFILE, logmsg);
 
     return sockfd;
 }
@@ -32,7 +34,8 @@ int Bind(int sockfd, struct sockaddr_in sockaddr){
         perror("bind");
         return -1;
     }
-    printf("Bind success!\n");
+    char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "Bind success!\n");
+    logging(LOGFILE, logmsg);
 
     return n;
 }
@@ -46,7 +49,8 @@ int Getsockname(int sockfd, struct sockaddr_in sockaddr, int sin_size){
     }
     
     port = ntohs(sockaddr.sin_port);
-    printf("socket has port %d\n", port); /* Display port number */
+    char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "socket has port %d\n", port); /* Display port number */
+    logging(LOGFILE, logmsg);
 
     return port;
 }
@@ -58,7 +62,8 @@ int Listen(int sockfd, int max_que_comm_nm){
          perror("listen");
          return -1;
     }
-    printf("Listening....\n");
+    char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "Listening....\n");
+    logging(LOGFILE, logmsg);
     return n;
 }
 
@@ -69,7 +74,8 @@ int Accept(int sockfd, struct sockaddr_in sockaddr, int sin_size){
         perror("accept");
         return -1;
     }
-    printf("New incoming connection - %d\n", client_fd);
+    char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "New incoming connection - %d\n", client_fd);
+    logging(LOGFILE, logmsg);
     return client_fd;
 }
 
@@ -80,7 +86,8 @@ int Recvfrom(int sockfd, Packet *packet, int size, int flag, struct sockaddr_in 
         perror("recvfrom");
         return -1;
     }    
-    printf("Recvfrom message: %s\n", packet);
+    char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "Recvfrom message: %s\n", packet);
+    logging(LOGFILE, logmsg);
     return recvbytes;
 }
 
@@ -91,7 +98,8 @@ int Sendto(int sockfd, Packet *packet, int size, int flag, struct sockaddr_in so
         perror("sendto");
         return -1;
     }
-    printf("Sendto message: %s\n", packet);
+    char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "Sendto message: %s\n", packet);
+    logging(LOGFILE, logmsg);
     return sendbytes;
 }
 
@@ -102,7 +110,8 @@ int Recv(int sockfd, Packet *packet, int size, int flag){
         perror("recv");
         return -1;
     }
-    printf("Recv message from: %s\n", packet->RouterID);
+    char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "Recv message from: %s\n", packet->RouterID);
+    logging(LOGFILE, logmsg);
     return recvbytes;
 }
 
@@ -113,7 +122,8 @@ int Send(int sockfd, Packet *packet, int size, int flag){
         perror("send");
         return -1;
     }
-    printf("Send message: %s\n",packet->RouterID);
+    char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "Send message: %s\n",packet->RouterID);
+    logging(LOGFILE, logmsg);
     return sendbytes;
 }
 
@@ -142,12 +152,14 @@ int Connect(int sockfd, struct sockaddr_in sockaddr, int sin_size){
 int writeFile(char *str, int size, char *file){
     FILE *fp;
     if ((fp = fopen(file,"w")) < 0){
-        printf("writefile: Failed to open file: %s\n", file);
+        char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "writefile: Failed to open file: %s\n", file);
+        logging(LOGFILE, logmsg);
         return;
     }
 
     if((fwrite(str, 1, size, fp))<0){
-        printf("writefile: Failed to write file %s.", file);
+        char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "writefile: Failed to write file %s.", file);
+        logging(LOGFILE, logmsg);
         return -1;
     }
 
@@ -160,17 +172,20 @@ int readFile(char *str, int size, char *file){
     FILE *fp;
 
     if(access(file, F_OK) < 0) {
-        printf("readfile: File not found: %s\n", file);
+        char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "readfile: File not found: %s\n", file);
+        logging(LOGFILE, logmsg);
         return -1;
     }
 
     if ((fp = fopen(file,"r")) < 0){
-        printf("readfile: Failed to open file: %s\n", file);
+        char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "readfile: Failed to open file: %s\n", file);
+        logging(LOGFILE, logmsg);
         return;
     }
 
     if((fgets(str, size, fp))<0){
-        printf("readfile: Failed to read file: %s\n", file);
+        char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "readfile: Failed to read file: %s\n", file);
+        logging(LOGFILE, logmsg);
         return -1;
     }
 
@@ -187,7 +202,8 @@ int unlinkPortFile(char *file){
     strcat(hostfile, file);
 
     if(unlink(hostfile) < 0){
-        printf("Failed to unlink file: %s \n", file);
+        char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "Failed to unlink file: %s \n", file);
+        logging(LOGFILE, logmsg);
         return -1;
     }
 
@@ -210,7 +226,8 @@ int writePort(int port, char *hostip){
         perror("writeport");
         return -1;
     }
-    printf("write port %s to file: %s\n", portstr, hostfile);
+    char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "write port %s to file: %s\n", portstr, hostfile);
+    logging(LOGFILE, logmsg);
 
     return 0;
 }
@@ -224,10 +241,21 @@ int getPort(char *portstr, char *ipfile){
     strcat(hostfile, ipfile);
 
     if(readFile(portstr, size, hostfile) < 0){
-        perror("getport");
         return -1;
     }
-    printf("port on %s is: %s\n", ipfile, portstr);
+    char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "port on %s is: %s\n", ipfile, portstr);
+    logging(LOGFILE, logmsg);
 
     return 0;
+}
+
+/* mark port */
+int markPort(char *filename, char *portstr, char *server){
+    char newline[32];
+    snprintf(newline, sizeof(newline), "%s=%s", portstr, server);
+
+    if(writeFile(newline, sizeof(newline), filename) < 0){
+        perror("markport");
+        return -1;
+    }
 }

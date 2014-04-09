@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "../config/config.h"
+#include "../config/liblog.h"
 #include "../../endsys/checksum.h"
 
 #define NEIGHBOR 1

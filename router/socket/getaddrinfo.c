@@ -36,7 +36,7 @@ getaddr(char *hostname, char *addrstr)
       return -1;
     }
 
-  printf ("Host: %s\n", hostname);
+  char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "Host: %s\n", hostname);
   while (res)
     {
       inet_ntop (res->ai_family, res->ai_addr->sa_data, addrstr, 100);
@@ -51,8 +51,7 @@ getaddr(char *hostname, char *addrstr)
           break;
         }
       inet_ntop (res->ai_family, ptr, addrstr, 100);
-      printf ("IPv%d address: %s (%s)\n", res->ai_family == PF_INET6 ? 6 : 4,
-              addrstr, res->ai_canonname);
+      char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "IPv%d address: %s (%s)\n", res->ai_family == PF_INET6 ? 6 : 4, addrstr, res->ai_canonname);
       res = res->ai_next;
     }
 

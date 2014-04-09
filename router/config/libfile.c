@@ -1,5 +1,6 @@
 #include<stdio.h>
 #include<string.h>
+#define LOGFILE "../lsrp-router.log"
 
 char *strstrip(char *s)
 {
@@ -29,11 +30,11 @@ int copyFile(char *input, char *output)
     //clrscr();
 
     if((fp1 = fopen(input,"r")) < 0){
-        printf("copyFile: Failed to open file: %s\n", input);
+        char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "copyFile: Failed to open file: %s\n", input);
         return -1;
     }
     if((fp2 = fopen(output,"w")) < 0){
-        printf("copyFile: Failed to open file: %s\n", output);
+        char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "copyFile: Failed to open file: %s\n", output);
         return -1;
     }
 
@@ -47,7 +48,7 @@ int copyFile(char *input, char *output)
           putc(ch,fp2);
     }
 
-    printf("File %s backup as: %s\n", input, output);
+    char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "File %s backup as: %s\n", input, output);
     fclose(fp1);
     fclose(fp2);
 

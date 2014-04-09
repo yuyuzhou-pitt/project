@@ -14,6 +14,7 @@ eth0_ip and eth0_ip_direct can not be used at the same time.
 #include<unistd.h>
 #include"libfile.h"
 #include"config.h"
+#include"liblog.h"
 
 Router *getRouter(char *filename){
     FILE *fp;
@@ -22,12 +23,14 @@ Router *getRouter(char *filename){
     ssize_t read;
 
     if(access(filename, F_OK) < 0) {
-        printf("getRouter: File not found: %s\n", filename);
-        return -1;
+        char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "getRouter: File not found: %s\n", filename);
+        logging(LOGFILE, logmsg);
+        return;
     }
 
     if ((fp = fopen(filename,"rt"))<0){
-        printf("getRouter: Faile to open file: %s \n", filename);
+        char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "getRouter: Faile to open file: %s \n", filename);
+        logging(LOGFILE, logmsg);
         return;
     }
 
@@ -107,15 +110,16 @@ int writeRouter(char *filename, Router *router){
     FILE *fp;
 
     if ((fp = fopen(filename,"wt")) < 0){
-        printf("writeRouter: Failed to open file: %s\n", filename);
+        char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "writeRouter: Failed to open file: %s\n", filename);
+        logging(LOGFILE, logmsg);
         return -1;
     }
 
     char routerStr[2048];
     memset(routerStr, 0, sizeof(routerStr));
     snprintf(routerStr, sizeof(routerStr), "\
-# NOTE: 1) update ETHX in config.h if more interfaces defined here \n\
-#       2) value does NOT have \"\" even it's a string \n\
+# NOTE: 1) please update num_of_interface when adding new interfaces \n\
+#       2) value does NOT have \"\" even it's a string type \n\
 \n\
 [Global config]\n\
 router_id = %s\n\
@@ -136,7 +140,7 @@ num_of_interface = %d\n\
 
     /* generate the Ethernet part */
     int i;
-    for(i=0;i<ETHX;i++){
+    for(i=0;i<router->num_of_interface;i++){
         char ethxStr[512];
         memset(ethxStr, 0, sizeof(ethxStr));
         snprintf(ethxStr, sizeof(ethxStr), "\
@@ -169,7 +173,8 @@ void cfgread(char filename[], char parameter[], char viarable[])
     int len, index;
 
     if ((fp = fopen(filename,"rt"))==NULL){
-        printf("\nCannot open file!");
+        char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "\nCannot open file!");
+        logging(LOGFILE, logmsg);
         return;
     }
     
@@ -178,7 +183,8 @@ void cfgread(char filename[], char parameter[], char viarable[])
     temp[index] = fgetc(fp);
     while (temp[index]!=EOF){
         if (index == len) {
-            printf("\nParameter %s is found!", parameter);
+            char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "\nParameter %s is found!", parameter);
+            logging(LOGFILE, logmsg);
             index = 0;
             temp[index]=fgetc(fp);
             temp[index]=fgetc(fp);//get rid of =
@@ -200,7 +206,8 @@ void cfgread(char filename[], char parameter[], char viarable[])
             temp[index] = fgetc(fp);
         }
     }
-    printf("\nError: parameter %s is not found!",parameter);
+    char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "\nError: parameter %s is not found!",parameter);
+    logging(LOGFILE, logmsg);
     fclose(fp); 
 }
 
@@ -212,13 +219,15 @@ void cfgwrite(char filename[], char parameter[], char content[])
     int par_len, con_len, index;
 
     if ((fp = fopen(filename,"rt+"))==NULL){
-        printf("\nCannot open file!");
+        char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "\nCannot open file!");
+        logging(LOGFILE, logmsg);
         return;
     }
     
     if ((tempfile = fopen("tempconfig","wt"))==NULL){
-       printf("\nCreate temp configure file fail!");
-       return;
+        char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "\nCreate temp configure file fail!");
+        logging(LOGFILE, logmsg);
+        return;
     }
     
     ch = fgetc(fp);
@@ -230,12 +239,14 @@ void cfgwrite(char filename[], char parameter[], char content[])
     fclose(tempfile); // back up old configure file
 
    if ((fp = fopen(filename,"wt"))==NULL){
-        printf("\nCannot reopen file!");
+        char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "\nCannot reopen file!");
+        logging(LOGFILE, logmsg);
         return;
     }
 
     if ((tempfile = fopen("tempconfig","rt"))==NULL){
-       printf("\nOpen temp configure file fail!");
+        char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "\nOpen temp configure file fail!");
+        logging(LOGFILE, logmsg);
        return;
     }
 
@@ -245,7 +256,8 @@ void cfgwrite(char filename[], char parameter[], char content[])
     temp[index] = fgetc(tempfile);
     while (temp[index]!=EOF){
         if (index == par_len) { // replace the parameter value
-            printf("\nParameter %s is found!", parameter);
+            char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "\nParameter %s is found!", parameter);
+            logging(LOGFILE, logmsg);
             fputc(temp[index],fp);
             index = 0;
             ch=fgetc(tempfile);fputc(ch,fp);
@@ -264,7 +276,8 @@ void cfgwrite(char filename[], char parameter[], char content[])
             }
             fclose(tempfile);
             fclose(fp);
-            printf("\nParameter %s is updated as %s!", parameter, content);
+            snprintf(logmsg, sizeof(logmsg), "\nParameter %s is updated as %s!", parameter, content);
+            logging(LOGFILE, logmsg);
             return;
         }
         else if (temp[index]!=parameter[index]) {
@@ -278,7 +291,8 @@ void cfgwrite(char filename[], char parameter[], char content[])
             temp[index] = fgetc(tempfile);
         }
     }
-    printf("\nError: parameter %s is not found!",parameter);
+    char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "\nError: parameter %s is not found!",parameter);
+    logging(LOGFILE, logmsg);
     fclose(fp);
     fclose(tempfile);
 }
@@ -287,7 +301,7 @@ void cfgwrite(char filename[], char parameter[], char content[])
 int main()
 {
 //  cfgread("lsrp-router.cfg","link_cost_method",j);
-//  printf("%s",j);
+//  char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "%s",j);
 //  cfgwrite("lsrp-router.cfg","eth_0_id","10.66.10.3");
 
     Router *router;
