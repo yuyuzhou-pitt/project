@@ -1,7 +1,7 @@
 #ifndef __CONFIG_H__
 #define __CONFIG_H__
 
-#define ETHX 2 //define interfaces number
+#define ETHX 128 // actual number of interface defined by num_of_interface
 
 char i[80];
 char j[80];
@@ -30,6 +30,12 @@ typedef struct LSRP_Router{
     /* [interface config] */
     Ethernet ethx[ETHX]; // there will be more than one interfaces, it will be an interfaces array
 }Router;
+
+/* for thread parameters */
+typedef struct Thread_Parameters{
+    int sockfd;
+    Router *router;
+}ThreadParam;
 
 void cfgread(char filename[], char parameter[], char viarable[]);
 void cfgwrite(char filename[], char parameter[], char content[]);
