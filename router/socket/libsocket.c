@@ -233,28 +233,31 @@ int writePort(int port, char *hostip){
 }
 
 /*get port from host file*/
-int getPort(char *portstr, char *ipfile){
+int getPort(char *portstr, int size, char *ipfile){
     char hostfile[17];
     memset(hostfile, 0, sizeof(hostfile));
-    int size = 6;
     strcpy(hostfile, ".");
     strcat(hostfile, ipfile);
 
     if(readFile(portstr, size, hostfile) < 0){
         return -1;
     }
-    char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "port on %s is: %s\n", ipfile, portstr);
-    logging(LOGFILE, logmsg);
+    //char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "port on %s is: %s\n", ipfile, portstr);
+    //logging(LOGFILE, logmsg);
 
     return 0;
 }
 
 /* mark port */
-int markPort(char *filename, char *portstr, char *server){
-    char newline[32];
-    snprintf(newline, sizeof(newline), "%s=%s", portstr, server);
+int markPort(char *filename, char *newline){
 
-    if(writeFile(newline, sizeof(newline), filename) < 0){
+    char hostfile[17];
+    memset(hostfile, 0, sizeof(hostfile));
+
+    strcpy(hostfile, ".");
+    strcat(hostfile, filename);
+
+    if(writeFile(newline, strlen(newline), hostfile) < 0){
         perror("markport");
         return -1;
     }

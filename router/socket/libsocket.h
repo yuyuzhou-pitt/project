@@ -1,6 +1,7 @@
 #ifndef __LIBSOCKET_H__
 #define __LIBSOCKET_H__
 
+#include <netinet/in.h>
 #include "../packet/packet.h"
 
 int Socket(int family, int type, int protocal);
