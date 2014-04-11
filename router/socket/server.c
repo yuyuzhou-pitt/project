@@ -17,10 +17,12 @@
 #include <pthread.h>
 #include "libsocket.h"
 #include "getaddrinfo.h"
-#include "../packet/neighbor.h"
 #include "../packet/hello.h"
 #include "../config/config.h"
 #include "../config/liblog.h"
+
+#define NEIGHBOR 1
+#include "../packet/neighbor.h"
 
 #define PORT 0 //0 means assign a port randomly
 #define BUFFER_SIZE  1024
@@ -68,8 +70,6 @@ void *serverthread(void *arg){
     Send(sockfd, neighbor_reply, sizeof(Packet), 0);
 
     char logmsg[128]; 
-    snprintf(logmsg, sizeof(logmsg), "serverthread(0x%x): reply neighbor acq type: %s\n", pthread_self(), neighbor_reply->Data.NeighborAcqType);
-    logging(LOGFILE, logmsg);
 
     /* if neighbor request confirmed:
      * 1) exchange alive (hello) message in HelloInterval seconds
@@ -77,6 +77,9 @@ void *serverthread(void *arg){
      *     */
 
     if(strcmp(neighbor_reply->Data.NeighborAcqType, "001") == 0){
+        snprintf(logmsg, sizeof(logmsg), "serverthread(0x%x): reply neighbor acq type: %s\n", \
+                                          pthread_self(), neighbor_reply->Data.NeighborAcqType);
+        logging(LOGFILE, logmsg);
         /* use a thread to keep alive */
         pthread_t hellothreadid;
         pthread_create(&hellothreadid, NULL, &helloserver, (void *) sockfd);
@@ -184,13 +187,13 @@ void *sockserver(void *arg){
                 break;
             default:
                 if (FD_ISSET(sockfd, &ready_set)){
-                    snprintf(logmsg, sizeof(logmsg), "sockserver: Listening socket is readable\n");
+                    snprintf(logmsg, sizeof(logmsg), "sockserver(0x%x): Listening socket is readable\n", pthread_self());
                     logging(LOGFILE, logmsg);
                     /* wait for connection */
                     client_fd = Accept(sockfd, client_sockaddr, sin_size);
                     FD_SET(client_fd, &test_set);
                     if (client_fd > maxfd) maxfd = client_fd;
-                    snprintf(logmsg, sizeof(logmsg), "sockserver: Descriptor %d is readable\n", i);
+                    snprintf(logmsg, sizeof(logmsg), "sockserver(0x%x): Descriptor %d is readable\n",  pthread_self(), client_fd);
                     logging(LOGFILE, logmsg);
 
                     threadParam->sockfd = client_fd;
