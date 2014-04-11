@@ -29,6 +29,12 @@ typedef struct Ping_Message{
     char ProtocolVersion[4]; // routers with different version should not be neighbors
 }Ping_Msg;
 
+typedef struct Transfer_File{
+    char filename[64];
+    char filetype[8];
+    char content[4096];
+}Trans_File;
+
 /*all message will be wrapped into packet*/
 typedef struct Packet{
     char RouterID[32]; // 0~31,default: LOOKBACK
@@ -41,6 +47,8 @@ typedef struct Packet{
     LSA_Msg Data; //34 + len(data)
 #elif PING
     Ping_Msg Data; //34 + len(data)
+#elif TRANSFILE
+    Trans_File Data; //34 + len(data)
 #else
     Neighbor_Msg Data; // default as Neighbor_Msg, which is the first message to exchange
 #endif
