@@ -134,7 +134,6 @@ getaddr(char *hostname, char *addrstr)
       return -1;
     }
 
-  //printf ("Host: %s\n", hostname);
   while (res)
     {
       inet_ntop (res->ai_family, res->ai_addr->sa_data, addrstr, 100);
@@ -156,43 +155,31 @@ getaddr(char *hostname, char *addrstr)
 
 char* convertPacketToChar(struct packet pkg)
 {
-printf(":The packet_type is %s\n",pkg.packet_type);
-printf(":The router_ID is %s\n",pkg.router_ID);
 	char* buffer = malloc(BUFFER_SIZE);
 	memset(buffer, 0, BUFFER_SIZE);
 	memcpy(buffer,pkg.router_ID, 17);
-
 	memcpy(buffer + 17,pkg.packet_type, 4);
 	memcpy(buffer + 21,pkg.src_IP, 33);
-	memcpy(buffer + 54,pkg.dest_IP ,33);
+	memcpy(buffer + 54,pkg.dest_IP, 33);
 	memcpy(buffer + 87,pkg.length, 11);
 	memcpy(buffer + 98,pkg.data, atoi(pkg.length) + 1);
-	memcpy(buffer + 99 + atoi(pkg.length),pkg.packet_life, 5);
-	memcpy(buffer + 103 + atoi(pkg.length),pkg.checksum, 33);
-	printf("the packet length:%s:",pkg.length);
-printf(":The checksum is %s\n",pkg.checksum);	
+	memcpy(buffer + 99 + atoi(pkg.length), pkg.packet_life, 5);
+	memcpy(buffer + 103 + atoi(pkg.length), pkg.checksum, 33);
 	return buffer;
 }
 
 struct packet convertCharToPacket(char* buffer)
 {
-	printf("test");
 	struct packet pkg;
 	memcpy(pkg.router_ID, buffer,17);	
-printf(":DUCK:The router_ID is %s\n",pkg.router_ID);
 	memcpy(pkg.packet_type, buffer + 17, 4);
-	printf("The packet_type is %s\n",pkg.packet_type);
 	memcpy(pkg.src_IP, buffer + 21, 33);
 	memcpy(pkg.dest_IP, buffer + 54 ,33);
 	memcpy(pkg.length, buffer + 87, 11);
-printf("DUCK:packet length: %d \n", atoi(pkg.length));
 	pkg.data = malloc( atoi(pkg.length) + 1);
 	memcpy(pkg.data, buffer + 98,atoi(pkg.length) + 1);
-printf("test");
 	memcpy(pkg.packet_life,buffer +99 + atoi(pkg.length), 5);
 	memcpy(pkg.checksum,buffer +104 + atoi(pkg.length), 33);
-printf(":DUCK:The data is %s\n",pkg.data);
-	printf(":The checksum is %s\n",pkg.checksum);
 	return pkg;
 }
 
@@ -252,9 +239,6 @@ void socket_rcvFile()
 
 void socket_sendFile(char * hostname, int port, struct packet pkg)
 {
-//printf("FINAL: %s",convertPacketToChar(pkg));
-//free(pkg.data);
-//lsrp_incomingmessage(convertCharToPacket(buff));
     int sockfd,sendbytes,recvbytes;
     char buff[BUFFER_SIZE];
     char buf[BUFFER_SIZE];
@@ -288,6 +272,6 @@ void socket_sendFile(char * hostname, int port, struct packet pkg)
     close(sockfd);
     free(buff);
     free(pkg.data);
-    sleep(5);
+    sleep(2);
 
 }

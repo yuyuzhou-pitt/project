@@ -37,8 +37,6 @@ struct packet packet_encapsulation(struct data_segment ds, int size)
 	free(ds.data);
 	
 	snprintf(pck.length, 11, "%010d", size);
-	printf("Length is: %d", atoi(pck.length));
-	printf(":Router ID is: %s", pck.router_ID);
 	snprintf(pck.checksum, sizeof(pck.checksum), "%032d",chksum_crc32((unsigned char*) pck.data, atoi(pck.length)));
 	return pck;
 
@@ -51,10 +49,9 @@ struct data_segment packet_decapsulation(struct packet pkt)
 	strcpy(ds.app_id, pkt.data + 2);
 	strcpy(ds.sequence_number, pkt.data + 19);
 	int  n = atoi(pkt.length) + 1;
-	printf("\nLENSES=%d",n);
 	ds.data = malloc(n);
 	memset(ds.data, 0, n);
-	memcpy(ds.data, pkt.data + 23,n);
+	memcpy(ds.data, pkt.data + 23, n);
 	free(pkt.data);
 	return ds;
 }
@@ -63,15 +60,11 @@ void lsrp_outgoingmessage(struct data_segment ds, int size)
 {
 	struct packet pck = packet_encapsulation(ds, size);
 	//packet_causeError(&pck);
-	printf(":MAX The data is %s\n",pck.data);	
-	//
 	socket_sendFile(edge_IP, edge_Port, pck);
-	//lsrp_incomingmessage(pck);
 }
 
 void lsrp_incomingmessage(struct packet pkt)
 {
-	printf(":MAX The data is %s\n",pkt.data);
 	/*if(commonfunctions_checkCRC_pkt(pkt) != 0)
 	{
 		//TODO

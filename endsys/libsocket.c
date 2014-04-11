@@ -78,7 +78,7 @@ int Recvfrom(int sockfd, char buff[], int size, int flag, struct sockaddr_in soc
         perror("recvfrom");
         return -1;
     }    
-    printf("Recvfrom message: %s\n", buff);
+    //printf("Recvfrom message: %s\n", buff);
     return recvbytes;
 }
 
@@ -89,7 +89,7 @@ int Sendto(int sockfd, char buf[], int buf_size, int flag, struct sockaddr_in so
         perror("sendto");
         return -1;
     }
-    printf("Sendto message: %s\n",buf);
+    //printf("Sendto message: %s\n",buf);
     return sendbytes;
 }
 
@@ -100,7 +100,7 @@ int Recv(int sockfd, char buff[], int size, int flag){
         perror("recv");
         return -1;
     }
-    printf("Recv message: %s\n", buff);
+    //printf("Recv message: %s\n", buff);
     return recvbytes;
 }
 
@@ -111,7 +111,7 @@ int Send(int sockfd, char buf[], int buf_size, int flag){
         perror("send");
         return -1;
     }
-    printf("Send message: %s\n",buf);
+    //printf("Send message: %s\n",buf);
     return sendbytes;
 }
 

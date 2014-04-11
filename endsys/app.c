@@ -60,7 +60,6 @@ int app_getAppID()
 struct message message_encapsulation_first(char* DEST_FILE)
 {
 	struct message message;
-	printf("STRLEN: %d", strlen(DEST_FILE));
 	message.data = (char *)malloc(strlen(DEST_FILE) + 1);
 	strcpy(message.data, DEST_FILE);
 	memcpy(message.data + strlen(DEST_FILE),"\0",1);
@@ -151,6 +150,7 @@ void app_outgoingFile(char filename[FILENAMESIZE], char* DEST_FILE, char * IP)
 			strcpy(temp_message.end_flag,"1");
 		sw_outgoingmessage(temp_message, atoi(temp_message.length) + 63 + 1);	
 	}
+	printf("File Sent: %s\n", file.name);
 }
 
 struct metadata* recieved = NULL;
@@ -170,7 +170,7 @@ void app_incomingFile(struct message msg)
 		recieved_pos++;
 		if(msg.end_flag[0] == '1')
 		{
-			printf("File Recieved\n");
+			printf("File Recieved: %s\n", (*recieved).name);
 			free(recieved);
 			recieved_pos = 0;
 		}
