@@ -66,7 +66,7 @@ int main(int argc, char *argv[]){
 
     /* for server thread */
     pthread_t sockserverid; 
-    fprintf(stdout, "lsrp-router: sockserver started, please track log file for detail: %s\n", LOGFILE);
+    fprintf(stdout, "please track log file for detail: %s\n", LOGFILE);
     pthread_create(&sockserverid, NULL, &sockserver, (void *)router);
 
     /* for client threads*/
@@ -82,20 +82,27 @@ int main(int argc, char *argv[]){
     
     /* start num_of_interface threads in busy wait */
     for(iThread=0; iThread < router->num_of_interface; iThread++){
-        fprintf(stdout, "lsrp-router: sockclient %d started.\n", iThread);
-        pthread_create(&threadid[iThread++], &attr, &sockclient, (void *)router);
+        pthread_create(&threadid[iThread], &attr, &sockclient, (void *)router);
     }
     
     int rc;
     char command[64], arguments[64];
-    fprintf(stdout, "Enter the commands: \n");
-    rc = vread("%s %s", command, arguments);
-    if (rc != 2){
-        fprintf(stderr, "Not all fields are assigned\n");
-    }
-    else{
-        fprintf(stdout, "command= %s\n", command);
-        fprintf(stdout, "arguments= %s\n", arguments);
+    int terminal = 1;
+    while(terminal == 1){
+        fprintf(stdout, "Enter the commands: \n");
+        rc = vread("%s %s", command, arguments);
+        if (rc != 2){
+            fprintf(stderr, "Not all fields are assigned\n");
+        }
+        else{
+            fprintf(stdout, "command = %s\n", command);
+            fprintf(stdout, "arguments = %s\n", arguments);
+
+            if(strcmp(command, "quit") == 0){
+                terminal = 0;
+                break;
+            }
+        }
     }
 
     return 0;
