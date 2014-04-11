@@ -16,33 +16,33 @@
 
 	struct message
 	{
-		char app_id[16]; // app process id, 0~32767
-		char length[10];
-		char end_flag[1];
+		char app_id[17]; // app process id, 0~32767
+		char length[11];
+		char end_flag[2];
 		char* data;
-		char checksum[32]; 
+		char checksum[33]; 
 	};
 
 	struct data_segment
 	{
-		char packet_type; //0-data 1-ack
+		char packet_type[2]; //0-data 1-ack
 		// App id number in case there are more than one file transfer in the same terminal 
 		// use file transfer app process id to distinguish between different apps
-		char app_id[16]; // app process id, 0~32767
-		char sequence_number[3];  // 0~7
-		struct message* data; 
+		char app_id[17]; // app process id, 0~32767
+		char sequence_number[4];  // 0~7
+		char* data; 
 	};
 
 	struct packet
 	{
-		char router_ID[16];
-		char packet_type[3]; // data packets are 110
-		char src_IP[32];
-		char dest_IP[32];
-		char length[10];
-		struct data_segment* data; 
-		char packet_life[4];
-		char checksum[32]; 
+		char router_ID[17];
+		char packet_type[4]; // data packets are 110
+		char src_IP[33];
+		char dest_IP[33];
+		char length[11];
+		char* data; 
+		char packet_life[5];
+		char checksum[33]; 
 	};
 
 
@@ -53,9 +53,11 @@
 	int commonfunctions_checkCRC(struct message msg);
 	int commonfunctions_checkCRC_pkt(struct packet pck);
 	int commonfunctions_checkSetRouter();
+	void commonItems_setErrorRate(int errorRate);
 
 	extern int MTU;
 	extern int edge_Port;
 	extern char edge_IP[16];
 	extern int timeout;
+	extern int errorRate;
 #endif

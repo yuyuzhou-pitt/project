@@ -60,12 +60,14 @@ int app_getAppID()
 struct message message_encapsulation_first(char* DEST_FILE)
 {
 	struct message message;
-	message.data = (char *)malloc(strlen(DEST_FILE));
-	message.data = DEST_FILE;
-	message.end_flag[0] = '0';
-	snprintf(message.app_id, sizeof(message.app_id), "%d", app_getAppID());
-	snprintf(message.length, sizeof(message.length), "%d", strlen(message.data));
-	snprintf(message.checksum, sizeof(message.checksum), "%d",chksum_crc32((unsigned char*) message.data, strlen(message.data)));
+	printf("STRLEN: %d", strlen(DEST_FILE));
+	message.data = (char *)malloc(strlen(DEST_FILE) + 1);
+	strcpy(message.data, DEST_FILE);
+	memcpy(message.data + strlen(DEST_FILE),"\0",1);
+	strcpy(message.end_flag,"0");
+	snprintf(message.app_id, 17, "%016d", app_getAppID());
+	snprintf(message.length, 11, "%010d", strlen(message.data));
+	snprintf(message.checksum, 33, "%032d",chksum_crc32((unsigned char*) message.data, strlen(message.data)));
 	return message;
 }
 
@@ -75,6 +77,7 @@ struct message message_encapsulation(struct metadata MD, int frag)
 	char line[81];
 	struct message message;
 	message.data = (char *)malloc(MTU + 1);
+  	memset(message.data, 0, MTU + 1);
 	fp = fopen(MD.name, "r");
 	fseek(fp, frag*MTU, SEEK_SET);
 
@@ -85,28 +88,29 @@ struct message message_encapsulation(struct metadata MD, int frag)
 	
 	while(fgets(line, lineLength, fp) != NULL && maxLeft != 0)
    	{
-		strcat(message.data, line);
+		strncat(message.data, line, strlen(line));
 		maxLeft -= lineLength;
 		if(maxLeft < 81)
 			lineLength = maxLeft + 1;
    	}
 	fclose(fp);
-
-	message.end_flag[0] = '0';
-	snprintf(message.app_id, sizeof(message.app_id), "%d", app_getAppID());
-	snprintf(message.length, sizeof(message.length), "%d", strlen(message.data));
-	snprintf(message.checksum, sizeof(message.checksum), "%d",chksum_crc32((unsigned char*) message.data, strlen(message.data)));
+	strcat(message.data, "\0");
+	
+	strcpy(message.end_flag,"0");
+	snprintf(message.app_id, sizeof(message.app_id), "%016d", app_getAppID());
+	snprintf(message.length, sizeof(message.length), "%010d", strlen(message.data));
+	snprintf(message.checksum, sizeof(message.checksum), "%032d",chksum_crc32((unsigned char*) message.data, strlen(message.data)));
 	return message;
 }
 
 void message_decapsulation(struct metadata MD, struct message msg, int frag)
 {
-	if(commonfunctions_checkCRC(msg) != 0)
+	/*if(commonfunctions_checkCRC(msg) != 0)
 	{
 		//TODO
 		printf("ERROR: CRC not correct \n");
 		return;
-	}
+	}*/
 	FILE *fp;
 	fp = fopen(MD.name, "a");
 	fseek(fp, frag*MTU, SEEK_SET);
@@ -116,11 +120,11 @@ void message_decapsulation(struct metadata MD, struct message msg, int frag)
 
 struct metadata message_decapsulation_first(struct message msg)
 {
-	if(commonfunctions_checkCRC(msg) != 0)
+	/*if(commonfunctions_checkCRC(msg) != 0)
 	{
 		//TODO
 		printf("ERROR: CRC not correct \n");
-	}
+	}*/
 	struct metadata file;
 	strcpy(file.name, msg.data);
 	FILE *fp;
@@ -138,14 +142,14 @@ void app_outgoingFile(char filename[FILENAMESIZE], char* DEST_FILE, char * IP)
 	file.fragments = (file.length + MTU- 1)/MTU;
 
 	struct message msg1 = message_encapsulation_first(DEST_FILE);	
-	sw_outgoingmessage(msg1);
+	sw_outgoingmessage(msg1, atoi(msg1.length) + 63 + 1);
 
 	for(int i = 0; i < file.fragments; i++)
 	{
 		struct message temp_message = message_encapsulation(file, i);
 		if(i + 1 == file.fragments)
-			temp_message.end_flag[0] = '1';
-		sw_outgoingmessage(temp_message);	
+			strcpy(temp_message.end_flag,"1");
+		sw_outgoingmessage(temp_message, atoi(temp_message.length) + 63 + 1);	
 	}
 }
 
@@ -158,6 +162,7 @@ void app_incomingFile(struct message msg)
 	{
 		recieved = malloc(sizeof(struct metadata));
 		*recieved = message_decapsulation_first(msg);
+		free(msg.data);
 	}
 	else
 	{
@@ -168,9 +173,8 @@ void app_incomingFile(struct message msg)
 			printf("File Recieved\n");
 			free(recieved);
 			recieved_pos = 0;
-			recieved = NULL;
 		}
+		free(msg.data);
 	}
-	memset(msg.data, 0, strlen(msg.data));
-	free(msg.data);
+	
 }

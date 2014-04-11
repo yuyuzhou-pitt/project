@@ -9,11 +9,12 @@ void readcfgs()
 {
 	app_readInCfg();
 	sw_readInCfg();
+	lsrp_readInCfg();
 }
 
 int main( int argc, const char* argv[] )
 {
-	socket_getIP();
+	socket_printIP();
 	socket_rcvFile();
 	readcfgs();
 	printf("STARTUP: Config files have been read\n");
@@ -42,6 +43,7 @@ int main( int argc, const char* argv[] )
 				FILE_DEST = strtok(NULL, ":");
 				app_outgoingFile( filename, FILE_DEST, IP);
 			}
+			//exit(0);
 		}
 		else if(strstr(cmd,"set-edge-router"))
 		{
@@ -53,8 +55,6 @@ int main( int argc, const char* argv[] )
 			char IP_address[16];
 			memcpy(IP_address, IP, sizeof(IP_address));
 			commonItems_setEdgeRouter(port,IP_address);
-
-			//CALL SETUP OF CLIENT
 		}
 		else if(strstr(cmd,"MTU"))
 		{
@@ -71,6 +71,12 @@ int main( int argc, const char* argv[] )
 		{
 			readcfgs();
 			printf("STATUS: Config files have been reread\n");
+		}
+		else if(strcmp(cmd,"test") == 0)
+		{  
+			struct packet pkg;
+			pkg.data = malloc(10);
+			socket_sendFile(edge_IP,edge_Port, pkg);		
 		}
 		else if(strcmp(cmd,"help") == 0)
 		{
@@ -90,4 +96,5 @@ int main( int argc, const char* argv[] )
 		printf("#");
 		scanf ("%79s",cmd);  
 	}
+	exit(0);
 }
