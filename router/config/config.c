@@ -43,6 +43,8 @@ Router *getRouter(char *filename){
     int interface = -1; // the index to router->ethx[ETHX]
     while ((read = getline(&line, &len, fp)) != -1) {
         tmp_param = strtok_r(line, "=", &saveptr); // got the param before "="
+        //printf("param=%s\n", tmp_param);
+        //printf("value=%s\n", saveptr);
         tmp_value = strtok(saveptr, "#"); // ignore the comments
 
         if(strstrip(tmp_param) == ""){
@@ -305,8 +307,8 @@ int main()
 //  cfgwrite("lsrp-router.cfg","eth_0_id","10.66.10.3");
 
     Router *router;
-    router = getRouter();
-    writeRouter(router);
+    router = getRouter("lsrp-router.cfg");
+    writeRouter("lsrp-router.cfg", router);
     return 0;
 }
 */
