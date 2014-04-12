@@ -22,11 +22,11 @@ struct packet packet_encapsulation(struct data_segment ds, int size)
 	memset(pck.packet_life,'0',4);
 	memset(pck.length,'0',10);
 
-	memcpy(pck.router_ID + 16, "\0",1);
-	memcpy(pck.packet_type, "110\0",4);
-	memcpy(pck.src_IP + 32, "\0",1);
-	memcpy(pck.dest_IP + 32, "\0",1);
-	memcpy(pck.packet_life + 4 , "\0",1);
+	memcpy(pck.router_ID + 16, "\0", 1);
+	memcpy(pck.packet_type, "110\0", 4);
+	memcpy(pck.src_IP + 32, "\0", 1);
+	memcpy(pck.dest_IP + 32, "\0", 1);
+	memcpy(pck.packet_life + 4 , "\0", 1);
 	
 	pck.data = malloc(size + 23);
 	memset(pck.data, 0, size);
@@ -65,13 +65,13 @@ void lsrp_outgoingmessage(struct data_segment ds, int size)
 
 void lsrp_incomingmessage(struct packet pkt)
 {
-	/*if(commonfunctions_checkCRC_pkt(pkt) != 0)
+	if(commonfunctions_checkCRC_pkt(pkt) != 0)
 	{
 		//TODO
 		//SEND NAN
 		printf("ERROR: CRC not correct at LSRP\n");
 	}
-	else*/
+	else
 	{
 		struct data_segment ds = packet_decapsulation(pkt);
 		sw_incomingmessage(ds);

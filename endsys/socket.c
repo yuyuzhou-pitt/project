@@ -158,28 +158,28 @@ char* convertPacketToChar(struct packet pkg)
 	char* buffer = malloc(BUFFER_SIZE);
 	memset(buffer, 0, BUFFER_SIZE);
 	memcpy(buffer,pkg.router_ID, 17);
-	memcpy(buffer + 17,pkg.packet_type, 4);
-	memcpy(buffer + 21,pkg.src_IP, 33);
-	memcpy(buffer + 54,pkg.dest_IP, 33);
-	memcpy(buffer + 87,pkg.length, 11);
-	memcpy(buffer + 98,pkg.data, atoi(pkg.length) + 1);
+	memcpy(buffer + 17, pkg.packet_type, 4);
+	memcpy(buffer + 21, pkg.src_IP, 33);
+	memcpy(buffer + 54, pkg.dest_IP, 33);
+	memcpy(buffer + 87 ,pkg.length, 11);
+	memcpy(buffer + 98, pkg.data, atoi(pkg.length) + 1);
 	memcpy(buffer + 99 + atoi(pkg.length), pkg.packet_life, 5);
-	memcpy(buffer + 103 + atoi(pkg.length), pkg.checksum, 33);
+	memcpy(buffer + 104 + atoi(pkg.length), pkg.checksum, 33);
 	return buffer;
 }
 
 struct packet convertCharToPacket(char* buffer)
 {
 	struct packet pkg;
-	memcpy(pkg.router_ID, buffer,17);	
+	memcpy(pkg.router_ID, buffer, 17);	
 	memcpy(pkg.packet_type, buffer + 17, 4);
 	memcpy(pkg.src_IP, buffer + 21, 33);
 	memcpy(pkg.dest_IP, buffer + 54 ,33);
 	memcpy(pkg.length, buffer + 87, 11);
 	pkg.data = malloc( atoi(pkg.length) + 1);
-	memcpy(pkg.data, buffer + 98,atoi(pkg.length) + 1);
-	memcpy(pkg.packet_life,buffer +99 + atoi(pkg.length), 5);
-	memcpy(pkg.checksum,buffer +104 + atoi(pkg.length), 33);
+	memcpy(pkg.data, buffer + 98, atoi(pkg.length) + 1);
+	memcpy(pkg.packet_life,buffer + 99 + atoi(pkg.length), 5);
+	memcpy(pkg.checksum,buffer + 104 + atoi(pkg.length), 33);
 	return pkg;
 }
 

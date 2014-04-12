@@ -104,12 +104,12 @@ struct message message_encapsulation(struct metadata MD, int frag)
 
 void message_decapsulation(struct metadata MD, struct message msg, int frag)
 {
-	/*if(commonfunctions_checkCRC(msg) != 0)
+	if(commonfunctions_checkCRC(msg) != 0)
 	{
 		//TODO
 		printf("ERROR: CRC not correct \n");
 		return;
-	}*/
+	}
 	FILE *fp;
 	fp = fopen(MD.name, "a");
 	fseek(fp, frag*MTU, SEEK_SET);
@@ -119,11 +119,11 @@ void message_decapsulation(struct metadata MD, struct message msg, int frag)
 
 struct metadata message_decapsulation_first(struct message msg)
 {
-	/*if(commonfunctions_checkCRC(msg) != 0)
+	if(commonfunctions_checkCRC(msg) != 0)
 	{
 		//TODO
 		printf("ERROR: CRC not correct \n");
-	}*/
+	}
 	struct metadata file;
 	strcpy(file.name, msg.data);
 	FILE *fp;

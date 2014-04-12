@@ -14,13 +14,13 @@ void readcfgs()
 
 int main( int argc, const char* argv[] )
 {
+	chksum_crc32gentab();
+	printf("STARTUP: CRC has been setup\n");
+
 	socket_printIP();
 	socket_rcvFile();
 	readcfgs();
 	printf("STARTUP: Config files have been read\n");
-
-	chksum_crc32gentab();
-	printf("STARTUP: CRC has been setup\n");
 	
 	char cmd[80];
 	printf("#");
