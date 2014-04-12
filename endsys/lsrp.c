@@ -17,15 +17,16 @@ struct packet packet_encapsulation(struct data_segment ds, int size)
 	struct packet pck;
 	memset(pck.router_ID,'0',16);
 	memset(pck.packet_type,'0',3);
-	memset(pck.src_IP,'0',32);
 	memset(pck.dest_IP,'0',32);
+	memset(pck.src_IP,'0',32);
 	memset(pck.packet_life,'1',4);
 	memset(pck.length,'0',10);
 
+	char * src_ip = socket_getIP();
+	memcpy(pck.src_IP + 33 - strlen(src_ip) - 1, src_ip, strlen(src_ip) + 1);
+	memcpy(pck.dest_IP + 33 - strlen(edge_IP) - 1, edge_IP, strlen(edge_IP) + 1);
 	memcpy(pck.router_ID + 16, "\0", 1);
 	memcpy(pck.packet_type, "110\0", 4);
-	memcpy(pck.src_IP + 32, "\0", 1);
-	memcpy(pck.dest_IP + 32, "\0", 1);
 	memcpy(pck.packet_life + 4 , "\0", 1);
 	
 	pck.data = malloc(size + 23);

@@ -106,6 +106,7 @@ char* socket_getIP()
       inet_ntop (res->ai_family, ptr, addrstr, 100);
       res = res->ai_next;
     }
+strcat(addrstr,"\0");
 return addrstr;
 }
 
@@ -180,6 +181,7 @@ struct packet convertCharToPacket(char* buffer)
 	memcpy(pkg.data, buffer + 98, atoi(pkg.length) + 1);
 	memcpy(pkg.packet_life,buffer + 99 + atoi(pkg.length), 5);
 	memcpy(pkg.checksum,buffer + 104 + atoi(pkg.length), 33);
+	free(buffer);
 	return pkg;
 }
 
@@ -230,7 +232,7 @@ void socket_rcvFile()
     		/* Receive from the remote side */
     		memset(buff, 0, sizeof(buff));
     		Recv(client_fd,buff,sizeof(buff),0);
-    		//Send(client_fd, buff, sizeof(buff),0);
+    		Send(client_fd, buff, sizeof(buff),0);
     		close(client_fd);
 		lsrp_incomingmessage(convertCharToPacket(buff));	
 	}
@@ -267,11 +269,8 @@ void socket_sendFile(char * hostname, int port, struct packet pkg)
     memset(buff, 0, sizeof(buff));
     memcpy(buff,convertPacketToChar(pkg),BUFFER_SIZE);
     sendbytes = Send(sockfd,buff,sizeof(buff), 0);
-    
-    //Recv(sockfd,buff,sizeof(buff), 0); 
+    Recv(sockfd,buff,sizeof(buff), 0); 
     close(sockfd);
     free(buff);
     free(pkg.data);
-    sleep(2);
-
 }

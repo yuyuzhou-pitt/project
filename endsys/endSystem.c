@@ -52,7 +52,7 @@ int main( int argc, const char* argv[] )
 			scanf ("%79s",IP);  
 			scanf ("%d",&port);
 			
-			char IP_address[16];
+			char IP_address[32];
 			memcpy(IP_address, IP, sizeof(IP_address));
 			commonItems_setEdgeRouter(port,IP_address);
 		}
