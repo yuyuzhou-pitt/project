@@ -28,10 +28,19 @@ void sw_readInCfg()
    	}
 }
 
-int sw_getAppID()
+int sw_getAppID() 
 {
 	int pid = getpid();
 	return pid;
+}
+
+struct data_segment sw_getACK()
+{
+	struct data_segment ds;
+	strcpy(ds.packet_type,"1");
+	snprintf(ds.app_id, sizeof(ds.app_id), "%016d", sw_getAppID());
+	strcpy(ds.sequence_number, "001\0");
+	return ds;
 }
 
 struct data_segment segment_encapsulation(struct message msg, int size)
@@ -39,7 +48,7 @@ struct data_segment segment_encapsulation(struct message msg, int size)
 	struct data_segment ds;
 	strcpy(ds.packet_type,"0");
 	snprintf(ds.app_id, sizeof(ds.app_id), "%016d", sw_getAppID());
-	strcpy(ds.sequence_number, "001\0");
+	strcpy(ds.sequence_number, "000\0");
 	
 	ds.data = malloc(size);
 	memset(ds.data, 0, size); 
@@ -73,9 +82,9 @@ void sw_outgoingmessage(struct message msg, int size, char * IP)
 	lsrp_outgoingmessage(ds, size + 23, IP);
 }
 
-void sw_incomingmessage(struct data_segment ds)
+int sw_incomingmessage(struct data_segment ds)
 {
 	struct message msg = segment_decapsulation(ds);
-	app_incomingFile(msg);
+	return app_incomingFile(msg);
 }
 

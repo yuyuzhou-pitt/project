@@ -14,6 +14,6 @@
 	struct metadata message_decapsulation_first(struct message msg);
 	
 	void app_outgoingFile(char filename[FILENAMESIZE], char DEST_FILE[160], char * IP);
-	void app_incomingFile(struct message msg);
+	int app_incomingFile(struct message msg);
 	void app_readInCfg();
 #endif

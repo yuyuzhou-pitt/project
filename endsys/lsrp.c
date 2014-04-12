@@ -12,6 +12,36 @@ void packet_causeError(struct packet* pkt)
 	}
 }
 
+struct packet lsrp_createACK(struct packet recv)
+{
+	struct packet pck;
+	memset(pck.router_ID,'0',16);
+	memset(pck.packet_type,'0',3);
+	memset(pck.dest_IP,'0',32);
+	memset(pck.src_IP,'0',32);
+	memset(pck.packet_life,'1',4);
+	memset(pck.length,'0',10);
+
+	memcpy(pck.src_IP, recv.dest_IP, 33);
+	memcpy(pck.dest_IP, recv.src_IP, 33);
+	memcpy(pck.router_ID + 16, "\0", 1);
+	memcpy(pck.packet_type, "110\0", 4);
+	memcpy(pck.packet_life + 4 , "\0", 1);
+	
+	struct data_segment ds = sw_getACK();
+	pck.data = malloc(23);
+	memset(pck.data, 0, 23);
+	memcpy(pck.data, ds.packet_type, 2);
+	memcpy(pck.data + 2, ds.app_id , 17);
+	memcpy(pck.data + 19, ds.sequence_number, 4);
+	
+	
+	snprintf(pck.length, 11, "%010d", 23);
+	snprintf(pck.checksum, sizeof(pck.checksum), "%032d",chksum_crc32((unsigned char*) pck.data, atoi(pck.length)));
+
+	return pck;
+}
+
 struct packet packet_encapsulation(struct data_segment ds, int size,  char * IP)
 {
 	struct packet pck;
@@ -64,19 +94,17 @@ void lsrp_outgoingmessage(struct data_segment ds, int size, char * IP)
 	socket_sendFile(edge_IP, edge_Port, pck);
 }
 
-void lsrp_incomingmessage(struct packet pkt)
+int lsrp_incomingmessage(struct packet pkt)
 {
 	if(commonfunctions_checkCRC_pkt(pkt) != 0)
 	{
-		//TODO
-		//SEND NAN
 		printf("ERROR: CRC not correct at LSRP\n");
+		return -1;
 	}
 	else
 	{
 		struct data_segment ds = packet_decapsulation(pkt);
-		sw_incomingmessage(ds);
-		//SEND ACK
+		return sw_incomingmessage(ds);
 	}
 }
 

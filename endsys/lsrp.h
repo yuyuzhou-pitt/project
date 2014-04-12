@@ -5,10 +5,11 @@
 #include "socket.h"
 
 void lsrp_outgoingmessage(struct data_segment ds, int size, char * IP);
-void lsrp_incomingmessage(struct packet pkt);
+int lsrp_incomingmessage(struct packet pkt);
 
 struct packet packet_encapsulation(struct data_segment ds, int size, char * IP);
 struct data_segment packet_decapsulation(struct packet pkt);
+struct packet lsrp_createACK(struct packet recv);
 
 void lsrp_readInCfg();
 

@@ -232,9 +232,17 @@ void socket_rcvFile()
     		/* Receive from the remote side */
     		memset(buff, 0, sizeof(buff));
     		Recv(client_fd,buff,sizeof(buff),0);
-    		Send(client_fd, buff, sizeof(buff),0);
-    		close(client_fd);
-		lsrp_incomingmessage(convertCharToPacket(buff));	
+		struct packet pkt = convertCharToPacket(buff);
+		if(lsrp_incomingmessage(pkt) == 0)
+		{
+			memcpy(buff,convertPacketToChar(lsrp_createACK(pkt)),BUFFER_SIZE);
+			Send(client_fd, buff, sizeof(buff),0);
+    			close(client_fd);
+		}
+		else
+		{
+			close(client_fd);	
+    		}
 	}
 	}
 }
@@ -243,7 +251,6 @@ void socket_sendFile(char * hostname, int port, struct packet pkg)
 {
     int sockfd,sendbytes,recvbytes;
     char buff[BUFFER_SIZE];
-    char buf[BUFFER_SIZE];
     struct hostent *host;
     struct sockaddr_in sockaddr;
 
