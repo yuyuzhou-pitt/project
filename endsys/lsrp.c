@@ -12,7 +12,7 @@ void packet_causeError(struct packet* pkt)
 	}
 }
 
-struct packet packet_encapsulation(struct data_segment ds, int size)
+struct packet packet_encapsulation(struct data_segment ds, int size,  char * IP)
 {
 	struct packet pck;
 	memset(pck.router_ID,'0',16);
@@ -24,7 +24,7 @@ struct packet packet_encapsulation(struct data_segment ds, int size)
 
 	char * src_ip = socket_getIP();
 	memcpy(pck.src_IP + 33 - strlen(src_ip) - 1, src_ip, strlen(src_ip) + 1);
-	memcpy(pck.dest_IP + 33 - strlen(edge_IP) - 1, edge_IP, strlen(edge_IP) + 1);
+	memcpy(pck.dest_IP + 33 - strlen(IP) - 1, IP, strlen(IP) + 1);
 	memcpy(pck.router_ID + 16, "\0", 1);
 	memcpy(pck.packet_type, "110\0", 4);
 	memcpy(pck.packet_life + 4 , "\0", 1);
@@ -57,9 +57,9 @@ struct data_segment packet_decapsulation(struct packet pkt)
 	return ds;
 }
 
-void lsrp_outgoingmessage(struct data_segment ds, int size)
+void lsrp_outgoingmessage(struct data_segment ds, int size, char * IP)
 {
-	struct packet pck = packet_encapsulation(ds, size);
+	struct packet pck = packet_encapsulation(ds, size, IP);
 	//packet_causeError(&pck);
 	socket_sendFile(edge_IP, edge_Port, pck);
 }

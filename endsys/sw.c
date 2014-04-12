@@ -67,10 +67,10 @@ struct message segment_decapsulation(struct data_segment ds)
 	return msg;
 }
 
-void sw_outgoingmessage(struct message msg, int size)
+void sw_outgoingmessage(struct message msg, int size, char * IP)
 {
 	struct data_segment ds = segment_encapsulation(msg, size);
-	lsrp_outgoingmessage(ds, size + 23);
+	lsrp_outgoingmessage(ds, size + 23, IP);
 }
 
 void sw_incomingmessage(struct data_segment ds)

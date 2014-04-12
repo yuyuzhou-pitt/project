@@ -141,14 +141,14 @@ void app_outgoingFile(char filename[FILENAMESIZE], char* DEST_FILE, char * IP)
 	file.fragments = (file.length + MTU- 1)/MTU;
 
 	struct message msg1 = message_encapsulation_first(DEST_FILE);	
-	sw_outgoingmessage(msg1, atoi(msg1.length) + 63 + 1);
+	sw_outgoingmessage(msg1, atoi(msg1.length) + 63 + 1, IP);
 
 	for(int i = 0; i < file.fragments; i++)
 	{
 		struct message temp_message = message_encapsulation(file, i);
 		if(i + 1 == file.fragments)
 			strcpy(temp_message.end_flag,"1");
-		sw_outgoingmessage(temp_message, atoi(temp_message.length) + 63 + 1);	
+		sw_outgoingmessage(temp_message, atoi(temp_message.length) + 63 + 1, IP);	
 	}
 	printf("File Sent: %s\n", file.name);
 }
