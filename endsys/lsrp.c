@@ -19,7 +19,7 @@ struct packet packet_encapsulation(struct data_segment ds, int size)
 	memset(pck.packet_type,'0',3);
 	memset(pck.src_IP,'0',32);
 	memset(pck.dest_IP,'0',32);
-	memset(pck.packet_life,'0',4);
+	memset(pck.packet_life,'1',4);
 	memset(pck.length,'0',10);
 
 	memcpy(pck.router_ID + 16, "\0", 1);
