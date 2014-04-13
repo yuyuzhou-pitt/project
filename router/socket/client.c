@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
+#include <sys/time.h>
 #include <netdb.h>
 #include <sys/types.h>
 #include <netinet/in.h>
@@ -14,6 +15,8 @@
 #include "libsocket.h"
 #include "../packet/neighbor.h"
 #include "../packet/hello.h"
+#include "../packet/ping.h"
+#include "../packet/lsa.h"
 #include "../config/config.h"
 #include "../config/liblog.h"
 
@@ -69,7 +72,6 @@ void *sockclient(void *arg){
                 int portFound = 0;
                 char tempport[6];
                 if(strlen(templine) > 5){
-                    printf("templine=%s\n", templine);
                     char tempsplit[128];
                     strcpy(tempsplit, templine);
                     char *split1, *split2, *strsplit = &tempsplit;
@@ -113,7 +115,7 @@ void *sockclient(void *arg){
                     strcat(templine, addrstr);
                     markPort(router->ethx[iEthx].direct_link_addr, templine); // mark that port has been used in the port file
                     snprintf(logmsg, sizeof(logmsg), "sockclient(0x%x): client %s use port %s:%s now.\n", pthread_self(), \
-                                                      router->ethx[iEthx].direct_link_addr, addrstr, portstr);
+                                                      addrstr, router->ethx[iEthx].direct_link_addr, portstr);
                     logging(LOGFILE, logmsg);
 
                     /* 6) connect to remote server */
@@ -155,7 +157,7 @@ void *sockclient(void *arg){
     Packet *neighbor_req, *neighbor_reply;
 
     /* generate neighbors_req according to configure file */
-    neighbor_req = genNeighborReq(router, addrstr, atoi(portstr)); // msg to be sent out
+    neighbor_req = genNeighborReq(router, atoi(portstr)); // msg to be sent out
     Send(sockfd, neighbor_req, sizeof(Packet), 0);
 
     neighbor_reply = (Packet *)malloc(sizeof(Packet));
@@ -163,8 +165,86 @@ void *sockclient(void *arg){
     Recv(sockfd, neighbor_reply, sizeof(Packet), 0);
 
     if(strcmp(neighbor_reply->Data.NeighborAcqType, "001") == 0){
-        pthread_t hellothreadid;
-        pthread_create(&hellothreadid, NULL, &helloclient, (void *) sockfd);
+        //pthread_t hellothreadid;
+        //pthread_create(&hellothreadid, NULL, &helloclient, (void *) sockfd);
+
+        int hello_interval = router->hello_interval;
+        int ping_interval = router->ping_interval;
+        int ls_updated_interval = router->ls_updated_interval;
+
+        int hello_sent = 0, ping_sent = 0, lsa_sent = 0;
+        time_t now1, now2, now3;
+        int ls_sequence_number = 0;
+
+        struct timeval timer; // use high quality timer to calculate the ping cost
+        struct timezone tzp;
+
+        //int sockfd = router->sockfd;
+        while(1){
+
+            gettimeofday(&timer, &tzp);
+            time_t now = timer.tv_sec;
+
+            Packet *packet_req, *packet_reply; // MUST use pointer to fit different Packet
+
+            /* hello message */
+            if(now % hello_interval ==0){
+                if(hello_sent == 0){
+                    now1 = now;
+                    hello_sent = 1;
+    
+                    //printf("hello_interval=%d\n", hello_interval);
+
+                    sendHello(sockfd, router, atoi(portstr));
+                    snprintf(logmsg, sizeof(logmsg), "sockclient(0x%x): Hello packet sent.\n", pthread_self());
+                    logging(LOGFILE, logmsg);
+                }
+                if(now != now1){
+                    hello_sent = 0;
+                }
+            }
+            /* ping message */
+            if(now % ping_interval ==0){
+                if(ping_sent == 0){
+                    now1 = now;
+                    ping_sent = 1;
+    
+                    //printf("ping_interval=%d\n", ping_interval);
+                    sendPing(sockfd, router, timer);
+                    snprintf(logmsg, sizeof(logmsg), "sockclient(0x%x): Ping packet sent.\n", pthread_self());
+                    logging(LOGFILE, logmsg);
+                }
+                if(now != now1){
+                    ping_sent = 0;
+                }
+            }
+            /* lsa message */
+            if(now % ls_updated_interval ==0){
+                if(lsa_sent == 0){
+                    now2 = now;
+                    lsa_sent = 1;
+                    ls_sequence_number++;
+ 
+                    //printf("ls_updated_interval=%d\n", ls_updated_interval);
+
+                    sendLSA(sockfd, router, ls_sequence_number, timer);
+                    snprintf(logmsg, sizeof(logmsg), "sockclient(0x%x): LSA packet sent.\n", pthread_self());
+                    logging(LOGFILE, logmsg);
+                }
+                if(now != now2){
+                    lsa_sent = 0;
+                }
+            }
+            /* read data from buffer */
+
+ 
+            /* Receive packet_req from server */
+            //packet_reply = (Packet *)malloc(sizeof(Packet));
+            //Recv(sockfd, packet_reply, sizeof(Packet), 0);
+
+            /* do nothing after receive packet from server ?? */
+        }
+
     }
 
     sleep(3600);
