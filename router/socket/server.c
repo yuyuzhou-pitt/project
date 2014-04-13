@@ -21,9 +21,6 @@
 #include "../config/config.h"
 #include "../config/liblog.h"
 
-#define NEIGHBOR 1
-#include "../packet/neighbor.h"
-
 #define PORT 0 //0 means assign a port randomly
 #define BUFFER_SIZE  1024
 #define MAX_QUE_CONN_NM 5
@@ -65,7 +62,7 @@ void *serverthread(void *arg){
     Recv(sockfd, neighbor_req, sizeof(Packet), 0);
 
     /* generate neighbors_reply reply according to configure file */
-    neighbor_reply = genNeighborReq(router, addrstr, port); // msg to be sent back
+    neighbor_reply = genNeighborReq(router, threadParam->port); // msg to be sent back
     genNeighborReply(router, neighbor_req, neighbor_reply); // update the Neighbor Acquisition Type
     Send(sockfd, neighbor_reply, sizeof(Packet), 0);
 
@@ -76,20 +73,76 @@ void *serverthread(void *arg){
      * 2) exchange LSA message in UpdateInterval seconds, or every time there is updates
      *     */
 
+    snprintf(logmsg, sizeof(logmsg), "serverthread(0x%x): reply neighbor acq type: %s\n", \
+                                      pthread_self(), neighbor_reply->Data.NeighborAcqType);
+    logging(LOGFILE, logmsg);
+
     if(strcmp(neighbor_reply->Data.NeighborAcqType, "001") == 0){
-        snprintf(logmsg, sizeof(logmsg), "serverthread(0x%x): reply neighbor acq type: %s\n", \
-                                          pthread_self(), neighbor_reply->Data.NeighborAcqType);
-        logging(LOGFILE, logmsg);
+
+        /* internal buffer, do not exchange to other routers */
+        //Packet_Buff *neighbor_buff, *hello_buff, *lsa_buff, *ping_buff;
+        
         /* use a thread to keep alive */
-        pthread_t hellothreadid;
-        pthread_create(&hellothreadid, NULL, &helloserver, (void *) sockfd);
+        //pthread_t hellothreadid;
+        //pthread_create(&hellothreadid, NULL, &helloserver, (void *) sockfd);
 
         /* use another thread for LSA */
         //pthread_t LSAthreadid;
         //pthread_create(&LSAthreadid, NULL, &LSAserver, (void *) sockfd);
+
+        struct timeval cost, timer; // use high quality timer to calculate the ping cost
+        struct timezone tzp;
+
+        /* accept Data from now on */
+        while(1){
+
+            gettimeofday(&timer, &tzp);
+
+            Packet *packet_req, *packet_reply; // MUST use pointer to fit different Packet
+        
+            /* Receive packet_req from client */
+            packet_req = (Packet *)malloc(sizeof(Packet));
+            Recv(sockfd, packet_req, sizeof(Packet), 0);
+        
+            /* Neighbor packet */
+            if(strcmp(packet_req->PacketType, "000")){
+                //sendNeighborReply(sockfd, packet_req, router, threadParam->port);
+            }
+            /* Hello packet */
+            else if(strcmp(packet_req->PacketType, "001")){
+                //sendHello(sockfd, router, threadParam->port);
+            }
+            /* LSA packet */
+            else if(strcmp(packet_req->PacketType, "010")){
+                /* use LSA to fill the routing table */
+                //sendLSA(sockfd, );
+            }
+            /* Ping packet */
+            else if(strcmp(packet_req->PacketType, "011")){
+                /* calculate link cost */
+                //sendPingReply(sockfd, router, )
+                //cost.tv_sec = timer.tv_sec - packet_req->Data.timer.tv_sec;
+                //cost.tv_usec = timer.tv_usec - packet_req->Data.timer.tv_usec;
+
+                /* update routing table */
+
+                /* generate hellos_reply reply according to configure file */
+                //packet_reply = genPingReq(router, '1', timer); // 1 means pong
+                //Send(sockfd, packet_reply, sizeof(Packet), 0);
+            }
+            /* Data packet */
+            else if(strcmp(packet_req->PacketType, "100")){
+                // data, addBuff();
+                //Thans_Data trans_data = (Trans_Data)packet->Data;
+                //getEthx(router, trans_data.des_ip); // calculate the out interface according to the routing table
+            }
+   
+
+        }
+
     }
 
-    sleep(3600);
+    //sleep(3600);
 
     /* Critical section */
     pthread_mutex_lock (&lock);
@@ -139,6 +192,7 @@ void *sockserver(void *arg){
 
     getaddr(hostname, addrstr); //get hostname and ip, getaddrinfo.h
     port = Getsockname(sockfd, server_sockaddr, sin_size);  /* Get the port number assigned*/
+    threadParam->port = port;
     writePort(port, addrstr);
     
     Listen(sockfd, MAX_QUE_CONN_NM);
