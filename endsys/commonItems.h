@@ -57,7 +57,7 @@
 
 	extern int MTU;
 	extern int edge_Port;
-	extern char edge_IP[32];
+	extern char edge_IP[17];
 	extern int timeout;
 	extern int errorRate;
 #endif

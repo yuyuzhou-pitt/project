@@ -24,7 +24,7 @@ struct packet lsrp_createACK(struct packet recv)
 
 	memcpy(pck.src_IP, recv.dest_IP, 33);
 	memcpy(pck.dest_IP, recv.src_IP, 33);
-	memcpy(pck.router_ID + 16, "\0", 1);
+	memcpy(pck.router_ID + 17 - strlen(edge_IP) - 1, edge_IP, strlen(edge_IP) + 1);
 	memcpy(pck.packet_type, "110\0", 4);
 	memcpy(pck.packet_life + 4 , "\0", 1);
 	
@@ -55,7 +55,7 @@ struct packet packet_encapsulation(struct data_segment ds, int size,  char * IP)
 	char * src_ip = socket_getIP();
 	memcpy(pck.src_IP + 33 - strlen(src_ip) - 1, src_ip, strlen(src_ip) + 1);
 	memcpy(pck.dest_IP + 33 - strlen(IP) - 1, IP, strlen(IP) + 1);
-	memcpy(pck.router_ID + 16, "\0", 1);
+	memcpy(pck.router_ID + 17 - strlen(edge_IP) - 1, edge_IP, strlen(edge_IP) + 1);
 	memcpy(pck.packet_type, "110\0", 4);
 	memcpy(pck.packet_life + 4 , "\0", 1);
 	

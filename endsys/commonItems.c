@@ -1,6 +1,6 @@
 #include "commonItems.h"
 int MTU = 1000;
-char edge_IP[32] = {'0','0','0','.','0','0','0','.','0','0','0','.','0','0','0','\0'};
+char edge_IP[17] = {'0','0','0','.','0','0','0','.','0','0','0','.','0','0','0','\0'};
 int edge_Port = 0;
 int timeout = 100;
 int errorRate = 0;
@@ -10,7 +10,7 @@ void commonItems_setMTU(int MTU_temp)
 	MTU = MTU_temp;
 }
 
-void commonItems_setEdgeRouter(int port, char IP[16])
+void commonItems_setEdgeRouter(int port, char IP[17])
 {
 	edge_Port = port;
 	memcpy(edge_IP, IP, sizeof(edge_IP));
