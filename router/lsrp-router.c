@@ -66,7 +66,7 @@ int main(int argc, char *argv[]){
 
     /* for server thread */
     pthread_t sockserverid; 
-    fprintf(stdout, "please track log file for detail: %s\n", LOGFILE);
+    fprintf(stdout, "lsrp-router: please track log file for detail: %s\n", LOGFILE);
     pthread_create(&sockserverid, NULL, &sockserver, (void *)router);
 
     /* for client threads*/
