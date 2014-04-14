@@ -9,8 +9,8 @@ char i[80];
 char j[80];
 
 typedef struct Router_Ethernet{
-    char eth_id[16];// = 136.142.227.14
-    char direct_link_addr[16]; // = 136.142.227.15 // remote host ip (router_id)
+    char eth_id[32];// = 10.0.0.1
+    char direct_link_addr[32]; // = 10.0.0.2
     int link_availability; //
     char link_cost_method[32]; // = manual // auto - calculated by  ping delay, manual - manual setting
     struct timeval link_cost; // = 9999 // infinit
@@ -20,7 +20,7 @@ typedef struct Router_Ethernet{
 
 typedef struct LSRP_Router{
     /* [Global config] */
-    char router_id[16]; // = 127.0.0.1
+    char router_id[32]; // = 127.0.0.1
     char protocol_version[4]; // = 1.0
     char acquisition_authorization[128]; //= password in md5sum
     int hello_interval; // = 40 //seconds
@@ -35,14 +35,6 @@ typedef struct LSRP_Router{
     /* [interface config] */
     Ethernet ethx[ETHX]; // there will be more than one interfaces, it will be an interfaces array
 }Router;
-
-/* for thread parameters */
-typedef struct Thread_Parameters{
-    int sockfd; // record the sockfd for client thread
-    int port; // record the port for client thread
-    Router *router;
-    //Packet_Buff buffer[ETHX];
-}ThreadParam;
 
 void cfgread(char filename[], char parameter[], char viarable[]);
 void cfgwrite(char filename[], char parameter[], char content[]);

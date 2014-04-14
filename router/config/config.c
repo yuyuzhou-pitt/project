@@ -143,6 +143,7 @@ int writeRouter(char *filename, Router *router){
     snprintf(routerStr, sizeof(routerStr), "\
 # NOTE: 1) please update num_of_interface when adding new interfaces \n\
 #       2) value does NOT have \"\" even it's a string type \n\
+#       3) eth_id identifies the link, set it UNIQUE please \n\
 \n\
 [Global config]\n\
 router_id = %s\n\
@@ -171,7 +172,7 @@ num_of_interface = %d\n\
         memset(ethxStr, 0, sizeof(ethxStr));
         snprintf(ethxStr, sizeof(ethxStr), "\
 [eth%d]\n\
-eth_id = %s\n\
+eth_id = %s # identifies the link, set it UNIQUE \n\
 direct_link_addr = %s # remote host ip (router_id)\n\
 link_availability = %d # default is avail\n\
 link_cost_method = %s # auto - calculated by  ping delay, manual - manual setting\n\
