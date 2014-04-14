@@ -230,6 +230,9 @@ void socket_rcvFile()
 		
     		char buff[BUFFER_SIZE];
     		/* Receive from the remote side */
+		int cont = 1;
+		while(cont == 1)
+		{
     		memset(buff, 0, sizeof(buff));
     		Recv(client_fd,buff,sizeof(buff),0);
 		struct packet pkt = convertCharToPacket(buff);
@@ -238,11 +241,9 @@ void socket_rcvFile()
 			memcpy(buff,convertPacketToChar(lsrp_createACK(pkt)),BUFFER_SIZE);
 			Send(client_fd, buff, sizeof(buff),0);
     			close(client_fd);
+			cont = 0;
 		}
-		else
-		{
-			close(client_fd);	
-    		}
+		}
 	}
 	}
 }
@@ -251,6 +252,7 @@ void socket_sendFile(char * hostname, int port, struct packet pkg)
 {
     int sockfd,sendbytes,recvbytes;
     char buff[BUFFER_SIZE];
+    char buff_recieved[BUFFER_SIZE];
     struct hostent *host;
     struct sockaddr_in sockaddr;
 
@@ -274,9 +276,40 @@ void socket_sendFile(char * hostname, int port, struct packet pkg)
 
     /*send message*/
     memset(buff, 0, sizeof(buff));
+    memset(buff_recieved, 0, sizeof(buff_recieved));
     memcpy(buff,convertPacketToChar(pkg),BUFFER_SIZE);
-    sendbytes = Send(sockfd,buff,sizeof(buff), 0);
-    Recv(sockfd,buff,sizeof(buff), 0); 
+    int pid = 0;
+    int cont = 1;
+    while(cont == 1)
+    {
+    if((pid = fork()) == 0)
+    { 
+	
+        sendbytes = Send(sockfd,buff,sizeof(buff), 0);
+        Recv(sockfd,buff_recieved,sizeof(buff_recieved), 0); 
+        _exit(0);
+    }
+    else
+    {
+	int i = 0;
+	while( i < timeout)
+	{
+	int status;
+	if(waitpid(pid, &status, WNOHANG)  > 0){
+		cont = 0;
+		break;
+	}
+	sleep(1); //timeout
+	i++;
+	}
+	if(cont == 1)
+	{
+	printf("#ERROR: Timeout occurred. Resending packet. \n");
+	kill(pid, SIGKILL);
+	}
+	
+    }
+    }
     close(sockfd);
     free(buff);
     free(pkg.data);

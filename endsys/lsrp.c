@@ -90,7 +90,7 @@ struct data_segment packet_decapsulation(struct packet pkt)
 void lsrp_outgoingmessage(struct data_segment ds, int size, char * IP)
 {
 	struct packet pck = packet_encapsulation(ds, size, IP);
-	//packet_causeError(&pck);
+	packet_causeError(&pck);
 	socket_sendFile(edge_IP, edge_Port, pck);
 }
 
