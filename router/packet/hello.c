@@ -18,11 +18,11 @@ Packet *genHelloReq(Router *router, int port){
     Packet *hello_packet;
     hello_packet = (Packet *)malloc(sizeof(Packet)); //Packet with Hello_Msg type Data
 
-    printf("PortID=%d", hello_packet->Data.PortID);
     snprintf(hello_packet->RouterID, sizeof(hello_packet->RouterID), "%s", router->router_id);
     snprintf(hello_packet->PacketType, sizeof(hello_packet->PacketType), "%s", "001"); // Hello Packets (001)
 
     hello_packet->Data = (Hello_Msg) hello_msg; // Data
+    //printf("PortID=%d", hello_packet->Data.PortID);
 
     /*checksum*/
     snprintf(hello_packet->PacketChecksum, sizeof(hello_packet->PacketChecksum), "%d", chksum_crc32((unsigned char*) hello_packet, sizeof(*hello_packet)));
@@ -35,7 +35,7 @@ int sendHello(int sockfd, Router *router, int port){
     Packet *hello_packet;
     hello_packet = genHelloReq(router, port); // msg to be sent back
     Send(sockfd, hello_packet, sizeof(Packet), 0);
+    //printf("sendHello: hello_packet->PacketType = %s\n", hello_packet->PacketType);
 
     return 0;
 }
-

@@ -36,22 +36,30 @@ int sendPing(int sockfd, Router *router, struct timeval timer){
     Packet *ping_packet;
     ping_packet = genPingMsg(router, '0', timer); // msg to be sent out, 0 means request 
     Send(sockfd, ping_packet, sizeof(Packet), 0);
+    //printf("sendPing: ping_packet->PacketType = %s\n", ping_packet->PacketType);
+
+    return 0;
 }
 
 int sendPong(int sockfd, Router *router, struct timeval timer){
     Packet *pong_packet;
     pong_packet = genPingMsg(router, '1', timer); // 1 means pong
     Send(sockfd, pong_packet, sizeof(Packet), 0);
+
+    return 0;
 }
 
-struct timeval calCost(Packet *packet_req, struct timeval timer){
-    struct timeval cost;
+int calCost(Packet *packet_req, int alpha, struct timeval cost, struct timeval timer){
+    struct timeval current_cost, new_cost;
 
     /* calculate link cost */
-    cost.tv_sec = timer.tv_sec - packet_req->Data.timer.tv_sec;
-    cost.tv_usec = timer.tv_usec - packet_req->Data.timer.tv_usec;
+    current_cost.tv_sec = timer.tv_sec - packet_req->Data.timer.tv_sec;
+    current_cost.tv_usec = timer.tv_usec - packet_req->Data.timer.tv_usec;
 
     /* update routing table */
 
-    return cost;
+    cost.tv_sec = alpha * cost.tv_sec + (1 -  alpha) * current_cost.tv_sec;
+    cost.tv_usec = alpha * cost.tv_usec + (1 -  alpha) * current_cost.tv_usec;
+    
+    return 0;
 }

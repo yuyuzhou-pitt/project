@@ -1,6 +1,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include "libqueue.h"
+
 /*list initialization*/
 Packet_Q *initlist(){
     Packet_Q *head, *z;
@@ -21,7 +23,7 @@ void enqueue(Packet_Q *head, Packet *v){
         z = r->next;
     }
     t = (Packet_Q *)malloc(sizeof *t);
-    t->key = v;
+    t->packet = v;
     t->next = z;
     r->next = t; //add the node to the end
 }
@@ -37,10 +39,11 @@ Packet_Q *dequeue(Packet_Q *head){
 /*Buff initialization*/
 Packet_Buff *initBuff(){
     Packet_Buff *packet_buff;
-    packet_buff = (Packet_Buff *)malloc(sizeof Packet_Buff);
-    packet_buff->value = v;
-    packet_buff->list = initlist();
-    return packet_q;
+    packet_buff = (Packet_Buff *)malloc(sizeof(Packet_Buff));
+    packet_buff->buffsize = 0;
+    packet_buff->packet_q = initlist();
+
+    return packet_buff;
 }
 
 /*get the list size*/
@@ -53,4 +56,11 @@ int listsize(Packet_Q *head){
         len++;
     }
     return len;
+}
+
+/* add LSA ack into buffer */
+int addBufferACK(ThreadParam *threadParam, Packet *packet_ack, int ethx){
+    enqueue(threadParam->buffer[ethx].packet_q, packet_ack);
+    threadParam->buffer[ethx].buffsize++;
+    return 0;
 }
