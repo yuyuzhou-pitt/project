@@ -20,6 +20,7 @@
 #include "socket/server.h"
 #include "socket/client.h"
 #include "packet/hello.h"
+#include "packet/libqueue.h"
 #include "config/config.h"
 #include "config/liblog.h"
 
@@ -64,10 +65,20 @@ int main(int argc, char *argv[]){
         router = getRouter(lsrpcfg);
     }
 
+    ThreadParam *threadParam;
+    threadParam = (ThreadParam *)malloc(sizeof(ThreadParam));
+    threadParam->ls_db_size = 0;
+    threadParam->router = router;
+    int i;
+    for(i=0;i < router->num_of_interface;i++){
+        threadParam->buffer[i].buffsize = 0; 
+        threadParam->buffer[i].packet_q = initlist();
+    }
+
     /* for server thread */
     pthread_t sockserverid; 
     fprintf(stdout, "lsrp-router: please track log file for detail: %s\n", LOGFILE);
-    pthread_create(&sockserverid, NULL, &sockserver, (void *)router);
+    pthread_create(&sockserverid, NULL, &sockserver, (void *)threadParam);
 
     /* for client threads*/
     pthread_t threadid[NTHREADS]; // Thread pool
@@ -82,7 +93,7 @@ int main(int argc, char *argv[]){
     
     /* start num_of_interface threads in busy wait */
     for(iThread=0; iThread < router->num_of_interface; iThread++){
-        pthread_create(&threadid[iThread], &attr, &sockclient, (void *)router);
+        pthread_create(&threadid[iThread], &attr, &sockclient, (void *)threadParam);
     }
     
     int rc;
