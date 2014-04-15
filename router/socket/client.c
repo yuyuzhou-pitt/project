@@ -16,6 +16,7 @@
 #include "../packet/neighbor.h"
 #include "../packet/hello.h"
 #include "../packet/ping.h"
+#include "../packet/libqueue.h"
 #include "../packet/lsa.h"
 #include "../config/config.h"
 #include "../config/liblog.h"
@@ -28,20 +29,24 @@
 char hostname[1024]; // local hostname and domain
 char addrstr[100]; // local ip address (eth0)
 
-pthread_mutex_t lock;
+pthread_mutex_t lock, lock_send, lock_buffer;
 
 /* thread for lsrp-client */
 void *sockclient(void *arg){
 //int main(void){
-    int sockfd,sendbytes,recvbytes;
+    ThreadParam *threadParam;
+    threadParam = (ThreadParam *) arg;
+
+    int clientfd,sendbytes,recvbytes;
     struct hostent *host;
     struct sockaddr_in sockaddr;
 
     Router *router;
-    router = (Router *)arg; // get the router cfg
+    router = threadParam->router; // get the router cfg
     getaddr(hostname, addrstr); //get hostname and ip, getaddrinfo.h
    
     /* try to get server hostname and port from the host files (.<servername>) */
+    char remote_server[32];
     char portstr[6]; // to store the port
     char logmsg[128];
     snprintf(logmsg, sizeof(logmsg), "sockclient(0x%x): busy wait for new server starting up...\n", pthread_self());
@@ -49,7 +54,7 @@ void *sockclient(void *arg){
     while(1){
         int iEthx;
         memset(portstr, 0, sizeof(portstr)); 
-        pthread_mutex_lock (&lock); // Critical section to read port files
+        pthread_mutex_lock(&lock); // Critical section to read port files
         /* Steps:
          * 1) go through all the direct_link_addr in cfg file
          * 2) if port file do NOT exists, busy wait
@@ -104,12 +109,13 @@ void *sockclient(void *arg){
                 }
 
                 if(portFound == 1){
+                    snprintf(remote_server, sizeof(remote_server), "%s", router->ethx[iEthx].direct_link_addr);
                     if((host = gethostbyname(router->ethx[iEthx].direct_link_addr)) == NULL ) { // got the remote server
                         perror("gethostbyname");
                         exit(-1);
                     };
                     /* 5) update client ip into the port file, in the format:
-                     *    34322:136.142.227.13:136.142.227.14
+                     *    34322:10.0.0.1:10.0.0.2
                      */
                     strcat(templine, ":");
                     strcat(templine, addrstr);
@@ -120,7 +126,7 @@ void *sockclient(void *arg){
 
                     /* 6) connect to remote server */
                     /*create socket*/
-                    sockfd = Socket(AF_INET, SOCK_STREAM, 0);
+                    clientfd = Socket(AF_INET, SOCK_STREAM, 0);
                 
                     /*parameters for sockaddr_in*/
                     sockaddr.sin_family = AF_INET;
@@ -129,13 +135,13 @@ void *sockclient(void *arg){
                     bzero(&(sockaddr.sin_zero), 8);         
                 
                     /*connect to server*/
-                    Connect(sockfd,sockaddr,sizeof(sockaddr));
+                    Connect(clientfd,sockaddr,sizeof(sockaddr));
 
                     break; //end the for loop
                 }
             }
         }
-        pthread_mutex_unlock (&lock); // Critical section end
+        pthread_mutex_unlock(&lock); // Critical section end
     
         sleep(READ_PORT_INTERVAL);
 
@@ -158,15 +164,15 @@ void *sockclient(void *arg){
 
     /* generate neighbors_req according to configure file */
     neighbor_req = genNeighborReq(router, atoi(portstr)); // msg to be sent out
-    Send(sockfd, neighbor_req, sizeof(Packet), 0);
+    Send(clientfd, neighbor_req, sizeof(Packet), 0);
 
     neighbor_reply = (Packet *)malloc(sizeof(Packet));
     /* Receive neighbors_reply from remote side */
-    Recv(sockfd, neighbor_reply, sizeof(Packet), 0);
+    Recv(clientfd, neighbor_reply, sizeof(Packet), 0);
 
     if(strcmp(neighbor_reply->Data.NeighborAcqType, "001") == 0){
         //pthread_t hellothreadid;
-        //pthread_create(&hellothreadid, NULL, &helloclient, (void *) sockfd);
+        //pthread_create(&hellothreadid, NULL, &helloclient, (void *) clientfd);
 
         int hello_interval = router->hello_interval;
         int ping_interval = router->ping_interval;
@@ -179,14 +185,16 @@ void *sockclient(void *arg){
         struct timeval timer; // use high quality timer to calculate the ping cost
         struct timezone tzp;
 
-        //int sockfd = router->sockfd;
+        int ethx = getEthx(router, remote_server);
+        Packet *packet_req, *packet_reply; // MUST use pointer to fit different Packet
+
+        //int clientfd = router->clientfd;
         while(1){
 
             gettimeofday(&timer, &tzp);
             time_t now = timer.tv_sec;
 
-            Packet *packet_req, *packet_reply; // MUST use pointer to fit different Packet
-
+            pthread_mutex_lock(&lock_send); // Critical section to read port files
             /* hello message */
             if(now % hello_interval ==0){
                 if(hello_sent == 0){
@@ -195,7 +203,8 @@ void *sockclient(void *arg){
     
                     //printf("hello_interval=%d\n", hello_interval);
 
-                    sendHello(sockfd, router, atoi(portstr));
+                    sendHello(clientfd, router, atoi(portstr));
+
                     snprintf(logmsg, sizeof(logmsg), "sockclient(0x%x): Hello packet sent.\n", pthread_self());
                     logging(LOGFILE, logmsg);
                 }
@@ -210,7 +219,7 @@ void *sockclient(void *arg){
                     ping_sent = 1;
     
                     //printf("ping_interval=%d\n", ping_interval);
-                    sendPing(sockfd, router, timer);
+                    sendPing(clientfd, router, timer);
                     snprintf(logmsg, sizeof(logmsg), "sockclient(0x%x): Ping packet sent.\n", pthread_self());
                     logging(LOGFILE, logmsg);
                 }
@@ -224,10 +233,11 @@ void *sockclient(void *arg){
                     now2 = now;
                     lsa_sent = 1;
                     ls_sequence_number++;
- 
-                    //printf("ls_updated_interval=%d\n", ls_updated_interval);
 
-                    sendLSA(sockfd, router, ls_sequence_number, timer);
+                    /* TODO: check acknowledgment, keep sending if no ack */
+                    sendNewLSA(clientfd, router, ls_sequence_number, timer, atoi(portstr));
+                    //sendNewLSA(clientfd, router, ls_sequence_number, timer, atoi(portstr), remote_server);
+                    //printf("ls_updated_interval=%d\n", ls_updated_interval);
                     snprintf(logmsg, sizeof(logmsg), "sockclient(0x%x): LSA packet sent.\n", pthread_self());
                     logging(LOGFILE, logmsg);
                 }
@@ -235,19 +245,66 @@ void *sockclient(void *arg){
                     lsa_sent = 0;
                 }
             }
-            /* read data from buffer */
+            pthread_mutex_unlock(&lock_send); // Critical section end
 
+            /* read data from buffer */
+            pthread_mutex_lock(&lock_buffer);
+            if(threadParam->buffer[ethx].buffsize > 0){
+                /* p *threadParam
+                $14 = {sockfd = 8, port = 46976, router = 0x608250, ls_db_size = 1, ls_db = {{Link_ID = "a", '\000' <repeats 30 times>, 
+                des_router_id = '\000' <repeats 31 times>, des_port_id = 12589, src_router_id = "10.0.0.1", '\000' <repeats 17 times>, 
+                src_port_id = 12589, Availability = 0, Link_Cost = {tv_sec = 52992208, tv_usec = 0}, LS_Age = 1397489400}, {
+                Link_ID = '\000' <repeats 31 times>, des_router_id = '\000' <repeats 31 times>, des_port_id = 0, 
+                src_router_id = '\000' <repeats 31 times>, src_port_id = 0, Availability = 0, Link_Cost = {tv_sec = 0, tv_usec = 0}, 
+                LS_Age = 0} <repeats 1023 times>}, buffer = {{buffsize = 0, packet_q = 0x60c3a0}, {buffsize = 0, packet_q = 0x60c3e0}, 
+                {buffsize = 0,   packet_q = 0x0} <repeats 126 times>}}
+                */
+
+                /* packet_q->next is the fist item in the queue
+                (gdb) p *threadParam->buffer[0].packet_q
+                $17 = {packet = 0x0, next = 0x60f000}
+                (gdb) p packet
+                $18 = (Packet *) 0x60f600
+                (gdb) p *threadParam->buffer[0].packet_q->next
+                $20 = {packet = 0x60f600, next = 0x60c3c0}
+                */
+
+
+                /* Neighbor packet */
+                if(strcmp(threadParam->buffer[ethx].packet_q->next->packet->PacketType, "000") == 0){
+                    // not possible
+                }
+                /* Hello packet */
+                else if(strcmp(threadParam->buffer[ethx].packet_q->next->packet->PacketType, "001") == 0){
+                    // not possible
+                }
+                /* Ping packet */
+                else if(strcmp(threadParam->buffer[ethx].packet_q->next->packet->PacketType, "011") == 0){
+                    // not possible
+                }
+                /* LSA packet */
+                else if(strcmp(threadParam->buffer[ethx].packet_q->next->packet->PacketType, "010") == 0){
+                    printf("sockclient: threadParam->buffer[ethx].buffsize=%d\n", threadParam->buffer[ethx].buffsize);
+                    sendBufferLSA(clientfd, threadParam->buffer[ethx]);
+                }
+                /* Data packet */
+                else if(strcmp(threadParam->buffer[ethx].packet_q->next->packet->PacketType, "100") == 0){
+                    // not possible
+                }
+
+            }
+            pthread_mutex_unlock(&lock_buffer);
  
             /* Receive packet_req from server */
             //packet_reply = (Packet *)malloc(sizeof(Packet));
-            //Recv(sockfd, packet_reply, sizeof(Packet), 0);
+            //Recv(clientfd, packet_reply, sizeof(Packet), 0);
 
             /* do nothing after receive packet from server ?? */
         }
 
     }
 
-    sleep(3600);
-    close(sockfd);
+    //sleep(3600);
+    close(clientfd);
     exit(0);
 }
