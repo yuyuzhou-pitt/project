@@ -9,12 +9,15 @@
 #include "packet.h"
 #include "libqueue.h"
 
-Packet *genLSAMsg(Router *router, int ls_sequence_number, struct timeval timer, int port){
+Packet *genLSAMsg(ThreadParam *threadParam, int ls_sequence_number, struct timeval timer){
 //Packet *genLSAMsg(Router *router, int ls_sequence_number, struct timeval timer, int port, char *remote_server){
     /*generate lsa message*/
+    Router *router;
+    router = threadParam->router;
 
     LSA_Msg lsa_msg;
 
+    //printf("genLSAMsg: set Advertising_Router_ID: %s\n", router->router_id);
     snprintf(lsa_msg.Advertising_Router_ID, sizeof(lsa_msg.Advertising_Router_ID), "%s", router->router_id); // original src_ip
     //snprintf(lsa_msg.Destination_Router_ID, sizeof(lsa_msg.Destination_Router_ID), "%s", remote_server); // original des_ip
     lsa_msg.LS_Age = timer.tv_sec;
@@ -24,15 +27,16 @@ Packet *genLSAMsg(Router *router, int ls_sequence_number, struct timeval timer, 
 
     int i;
     for(i=0;i < router->num_of_interface;i++){
+        //printf("genLSAMsg: set port id: %d\n", port);
         snprintf(lsa_msg.ls_link[i].Link_ID, sizeof(lsa_msg.ls_link[i].Link_ID), "%s", router->ethx[i].eth_id);
         snprintf(lsa_msg.ls_link[i].Direct_Link_Addr, sizeof(lsa_msg.ls_link[i].Direct_Link_Addr), "%s", router->ethx[i].direct_link_addr);
-        lsa_msg.ls_link[i].PortID = port;
+        lsa_msg.ls_link[i].PortID = threadParam->port;
         lsa_msg.ls_link[i].Availability = router->ethx[i].link_availability; //default as 1, set it as 0 if timeout or disabled
         lsa_msg.ls_link[i].Link_Cost = router->ethx[i].link_cost; //router->ethx[i].link_cost;
     }
     /*wrap into packet*/
     Packet *lsa_packet;
-    lsa_packet = (Packet *)malloc(sizeof(Packet)); //Packet with LSA_Msg type Data
+    lsa_packet = (Packet *)calloc(1, sizeof(Packet)); //Packet with LSA_Msg type Data
 
     snprintf(lsa_packet->RouterID, sizeof(lsa_packet->RouterID), "%s", router->router_id);
     snprintf(lsa_packet->PacketType, sizeof(lsa_packet->PacketType), "%s", "010"); // LSA Packets (010)
@@ -45,11 +49,70 @@ Packet *genLSAMsg(Router *router, int ls_sequence_number, struct timeval timer, 
     return lsa_packet;
 }
 
-int sendNewLSA(int sockfd, Router *router, int ls_sequence_number, struct timeval timer, int port){
+int installLSA(ThreadParam *threadParam, Packet *packet_req){
+    Packet *packet;
+    packet = (Packet *)packet_req;
+
+    /* check whether the same LSA with new sequence number */
+    int sameLSA = 0;
+
+    int dbIndex;
+    //printf("installLSA: got LSA packet from: %s\n", packet->Data.Advertising_Router_ID);
+    for(dbIndex=0;dbIndex < threadParam->ls_db_size; dbIndex++){
+        /* whether Advertising_Router_ID is the des_router_id */
+        if(strcmp(threadParam->ls_db[dbIndex].des_router_id, packet->Data.Advertising_Router_ID) == 0){
+            sameLSA = 1;
+            /* do update if got bigger seq number */
+            //printf("installLSA: this packet from %s in db already\n", packet->Data.Advertising_Router_ID);
+            if(threadParam->ls_db[dbIndex].LS_Sequence_Number < packet->Data.LS_Sequence_Number){
+                //printf("installLSA: do update as got bigger seq number %d from: %s\n", packet->Data.LS_Sequence_Number, packet->Data.Advertising_Router_ID);
+                int i;
+                for(i=0;i < packet->Data.Number_of_Links;i++){
+                    if(strcmp(threadParam->ls_db[dbIndex].src_router_id, packet->Data.ls_link[i].Direct_Link_Addr) == 0){
+                        threadParam->ls_db[dbIndex].Availability = packet->Data.ls_link[i].Availability;
+                        threadParam->ls_db[dbIndex].LS_Sequence_Number = packet->Data.LS_Sequence_Number;
+                        threadParam->ls_db[dbIndex].Link_Cost = packet->Data.ls_link[i].Link_Cost;
+                        threadParam->ls_db[dbIndex].LS_Age = packet->Data.LS_Age;
+                    }
+                }
+
+            }
+        }
+    }
+
+    if(sameLSA == 0){
+        //printf("installLSA: install new LSA packet from %s\n", packet->Data.Advertising_Router_ID);
+        /* add all new LS into db */
+        int i;
+        for(i=0;i < packet->Data.Number_of_Links;i++){
+            //printf("installLSA: Advertising_Router_ID - PortID: %s - %s\n", packet->Data.Advertising_Router_ID, packet->Data.ls_link[i].PortID);
+            dbIndex = threadParam->ls_db_size;
+            snprintf(threadParam->ls_db[dbIndex].Link_ID, sizeof(threadParam->ls_db[dbIndex].Link_ID), "%s", packet->Data.ls_link[i].Link_ID);
+            snprintf(threadParam->ls_db[dbIndex].src_router_id, sizeof(threadParam->ls_db[dbIndex].src_router_id), "%s", packet->Data.ls_link[i].Direct_Link_Addr);
+            threadParam->ls_db[dbIndex].des_port_id = packet->Data.ls_link[i].PortID;
+            snprintf(threadParam->ls_db[dbIndex].des_router_id, sizeof(threadParam->ls_db[dbIndex].des_router_id), "%s", packet->Data.Advertising_Router_ID);
+            threadParam->ls_db[dbIndex].src_port_id = packet->Data.ls_link[i].PortID;
+            threadParam->ls_db[dbIndex].Availability = packet->Data.ls_link[i].Availability;
+            threadParam->ls_db[dbIndex].LS_Sequence_Number = packet->Data.LS_Sequence_Number;
+            threadParam->ls_db[dbIndex].Link_Cost = packet->Data.ls_link[i].Link_Cost;
+            threadParam->ls_db[dbIndex].LS_Age = packet->Data.LS_Age;
+    
+            threadParam->ls_db_size++;
+        }
+    }
+
+    return 0;
+}
+
+int sendNewLSA(int sockfd, ThreadParam *threadParam, int ls_sequence_number, struct timeval timer, int port){
 //int sendNewLSA(int sockfd, Router *router, int ls_sequence_number, struct timeval timer, int port, char *remote_server){
     Packet *lsa_packet;
     //lsa_packet = genLSAMsg(router, ls_sequence_number, timer, port, remote_server); // msg to be sent out
-    lsa_packet = genLSAMsg(router, ls_sequence_number, timer, port); // msg to be sent out
+
+    lsa_packet = genLSAMsg(threadParam, ls_sequence_number, timer); // msg to be sent out
+    /* add into LS DB before send out */
+    installLSA(threadParam, lsa_packet);
+    //printf("sendNewLSA: send LSA packet %s with type %s\n", lsa_packet->RouterID, lsa_packet->PacketType);
     Send(sockfd, lsa_packet, sizeof(Packet), 0);
     //printf("sendLSA: lsa_packet->PacketType = %s\n", lsa_packet->PacketType);
     return 0;
@@ -76,55 +139,6 @@ int sendBufferLSA(int sockfd, Packet_Buff *buffer){
     return 0;
 }
 
-int installLSA(ThreadParam *threadParam, Packet *packet_req, int ethx){
-    Packet *packet;
-    packet = (Packet *)packet_req;
-
-    /* check whether the same LSA with new sequence number */
-    int sameLSA = 0;
-
-    int dbIndex;
-    for(dbIndex=0;dbIndex < threadParam->ls_db_size; dbIndex++){
-        if(strcmp(threadParam->ls_db[dbIndex].des_router_id, packet->Data.Advertising_Router_ID) == 0){
-            sameLSA = 1;
-            /* do update if got bigger seq number */
-            if(threadParam->ls_db[dbIndex].LS_Sequence_Number < packet->Data.LS_Sequence_Number){
-                int i;
-                for(i=0;i < packet->Data.Number_of_Links;i++){
-                    if(strcmp(threadParam->ls_db[dbIndex].src_router_id, packet->Data.ls_link[i].Direct_Link_Addr) == 0){
-                        threadParam->ls_db[dbIndex].Availability = packet->Data.ls_link[i].Availability;
-                        threadParam->ls_db[dbIndex].LS_Sequence_Number = packet->Data.LS_Sequence_Number;
-                        threadParam->ls_db[dbIndex].Link_Cost = packet->Data.ls_link[i].Link_Cost;
-                        threadParam->ls_db[dbIndex].LS_Age = packet->Data.LS_Age;
-                    }
-                }
-
-            }
-        }
-    }
-
-    if(sameLSA == 0){
-        /* add all new LS into db */
-        int i;
-        for(i=0;i < packet->Data.Number_of_Links;i++){
-            dbIndex = threadParam->ls_db_size;
-            snprintf(threadParam->ls_db[dbIndex].Link_ID, sizeof(threadParam->ls_db[dbIndex].Link_ID), "%s", packet->Data.ls_link[i].Link_ID);
-            snprintf(threadParam->ls_db[dbIndex].src_router_id, sizeof(threadParam->ls_db[dbIndex].src_router_id), "%s", packet->Data.ls_link[i].Direct_Link_Addr);
-            threadParam->ls_db[dbIndex].des_port_id = packet->Data.ls_link[i].PortID;
-            snprintf(threadParam->ls_db[dbIndex].des_router_id, sizeof(threadParam->ls_db[dbIndex].des_router_id), "%s", packet->Data.Advertising_Router_ID);
-            threadParam->ls_db[dbIndex].src_port_id = packet->Data.ls_link[i].PortID;
-            threadParam->ls_db[dbIndex].Availability = packet->Data.ls_link[i].Availability;
-            threadParam->ls_db[dbIndex].LS_Sequence_Number = packet->Data.LS_Sequence_Number;
-            threadParam->ls_db[dbIndex].Link_Cost = packet->Data.ls_link[i].Link_Cost;
-            threadParam->ls_db[dbIndex].LS_Age = packet->Data.LS_Age;
-    
-            threadParam->ls_db_size++;
-        }
-    }
-
-    return 0;
-}
-
 /* add LSA to flood buffer, except the ethx from which it received the LSA. */
 int addBufferFlood(ThreadParam *threadParam, Packet *packet, int ethx){
     int i;
@@ -145,6 +159,21 @@ int addBufferFlood(ThreadParam *threadParam, Packet *packet, int ethx){
                 //printf("addBufferflood:threadParam->buffer[i].buffsize = %d\n",threadParam->buffer[i].buffsize);
             }
         }
+    }
+    return 0;
+}
+
+/* for terminal */
+int showLSDB(ThreadParam *threadParam){
+    int i;
+    printf("\nshowLSDB: ls_db_size: %d\n", threadParam->ls_db_size);
+    printf("Link_ID            \tsrc_router\tdes_router\tport\tAvail\tSeq\tCost\tLS_Age    \n");
+    /*  10.0.0.1	10.0.0.4	10.0.0.5	36747	1	3	9999:0	1397584710 */
+    for(i=0;i < threadParam->ls_db_size;i++){
+        printf("%s\t%s\t%s\t%d\t%d\t%d\t%d:%d\t%d\n", threadParam->ls_db[i].Link_ID, threadParam->ls_db[i].src_router_id, \
+               threadParam->ls_db[i].des_router_id, threadParam->ls_db[i].des_port_id, threadParam->ls_db[i].Availability, \
+               threadParam->ls_db[i].LS_Sequence_Number, threadParam->ls_db[i].Link_Cost.tv_sec, \
+               threadParam->ls_db[i].Link_Cost.tv_usec, threadParam->ls_db[i].LS_Age);
     }
     return 0;
 }
