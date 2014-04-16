@@ -49,17 +49,21 @@ int sendPong(int sockfd, Router *router, struct timeval timer){
     return 0;
 }
 
-int calCost(Packet *packet_req, int alpha, struct timeval cost, struct timeval timer){
-    struct timeval current_cost, new_cost;
+struct timeval *calCost(Packet *packet_req, int alpha, struct timeval *cost, struct timeval timer){
+    struct timeval current_cost, *new_cost;
 
+    //printf("calCost: my timer is: %d:%d\n", timer.tv_sec, timer.tv_usec);
+    //printf("calCost: remote timer is: %d:%d\n", packet_req->Data.timer.tv_sec, packet_req->Data.timer.tv_usec);
     /* calculate link cost */
     current_cost.tv_sec = timer.tv_sec - packet_req->Data.timer.tv_sec;
     current_cost.tv_usec = timer.tv_usec - packet_req->Data.timer.tv_usec;
 
+    //printf("calCost: raw cost is: %d:%d\n", current_cost.tv_sec, current_cost.tv_usec);
     /* update routing table */
 
-    cost.tv_sec = alpha * cost.tv_sec + (1 -  alpha) * current_cost.tv_sec;
-    cost.tv_usec = alpha * cost.tv_usec + (1 -  alpha) * current_cost.tv_usec;
+    cost->tv_sec = alpha * cost->tv_sec + (1 -  alpha) * current_cost.tv_sec;
+    cost->tv_usec = alpha * cost->tv_usec + (1 -  alpha) * current_cost.tv_usec;
+    printf("calCost: real cost is: %d:%d\n", cost->tv_sec, cost->tv_usec);
     
-    return 0;
+    return cost;
 }

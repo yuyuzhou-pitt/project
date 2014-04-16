@@ -19,7 +19,7 @@ typedef struct Packet_Buffer{
 /* for thread parameters */
 typedef struct Thread_Parameters{
     int sockfd; // record the sockfd for client thread
-    int port; // record the port for client thread
+    int port; // record the port for client thread use
     Router *router;
     int ls_db_size;
     LS_DB ls_db[DBMAX];
