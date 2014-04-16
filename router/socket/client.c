@@ -194,7 +194,7 @@ void *sockclient(void *arg){
             gettimeofday(&timer, &tzp);
             time_t now = timer.tv_sec;
 
-            pthread_mutex_lock(&lock_send); // Critical section to read port files
+            //pthread_mutex_lock(&lock_send); // Critical section to read port files
             /* hello message */
             if(now % hello_interval ==0){
                 if(hello_sent == 0){
@@ -203,7 +203,9 @@ void *sockclient(void *arg){
     
                     //printf("hello_interval=%d\n", hello_interval);
 
+                    pthread_mutex_lock(&lock_send); // Critical section to read port files
                     sendHello(clientfd, router, atoi(portstr));
+                    pthread_mutex_unlock(&lock_send); // Critical section end
 
                     snprintf(logmsg, sizeof(logmsg), "sockclient(0x%x): Hello packet sent.\n", pthread_self());
                     logging(LOGFILE, logmsg);
@@ -219,7 +221,10 @@ void *sockclient(void *arg){
                     ping_sent = 1;
     
                     //printf("ping_interval=%d\n", ping_interval);
+                    pthread_mutex_lock(&lock_send); // Critical section to read port files
                     sendPing(clientfd, router, timer);
+                    pthread_mutex_unlock(&lock_send); // Critical section end
+
                     snprintf(logmsg, sizeof(logmsg), "sockclient(0x%x): Ping packet sent.\n", pthread_self());
                     logging(LOGFILE, logmsg);
                 }
@@ -235,7 +240,11 @@ void *sockclient(void *arg){
                     ls_sequence_number++;
 
                     /* TODO: check acknowledgment, keep sending if no ack */
-                    sendNewLSA(clientfd, router, ls_sequence_number, timer, atoi(portstr));
+                    pthread_mutex_lock(&lock_send); // Critical section to read port files
+                    //printf("sockclient(0x%x): send LSA packet from %s to %s\n", pthread_self(), addrstr, remote_server);
+                    sendNewLSA(clientfd, threadParam, ls_sequence_number, timer, atoi(portstr));
+                    pthread_mutex_unlock(&lock_send); // Critical section end
+
                     //sendNewLSA(clientfd, router, ls_sequence_number, timer, atoi(portstr), remote_server);
                     //printf("ls_updated_interval=%d\n", ls_updated_interval);
                     snprintf(logmsg, sizeof(logmsg), "sockclient(0x%x): LSA packet sent.\n", pthread_self());
@@ -245,7 +254,7 @@ void *sockclient(void *arg){
                     lsa_sent = 0;
                 }
             }
-            pthread_mutex_unlock(&lock_send); // Critical section end
+            //pthread_mutex_unlock(&lock_send); // Critical section end
 
             /* read data from buffer */
             pthread_mutex_lock(&lock_buffer);
@@ -284,7 +293,7 @@ void *sockclient(void *arg){
                 }
                 /* LSA packet */
                 else if(strcmp(threadParam->buffer[ethx].packet_q->next->packet->PacketType, "010") == 0){
-                    printf("sockclient: threadParam->buffer[ethx].buffsize=%d\n", threadParam->buffer[ethx].buffsize);
+                    //printf("sockclient: threadParam->buffer[ethx].buffsize=%d\n", threadParam->buffer[ethx].buffsize);
                     sendBufferLSA(clientfd, threadParam->buffer[ethx]);
                 }
                 /* Data packet */

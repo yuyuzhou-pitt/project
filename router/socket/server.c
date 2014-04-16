@@ -90,23 +90,23 @@ void *serverthread(void *arg){
         //pthread_t LSAthreadid;
         //pthread_create(&LSAthreadid, NULL, &LSAserver, (void *) sockfd);
 
-        struct timeval cost, timer; // use high quality timer to calculate the ping cost
+        struct timeval *tmpcost, cost, timer; // use high quality timer to calculate the ping cost
         struct timezone tzp;
-
-        Packet *packet_req, *packet_reply; // MUST use pointer to fit different Packet
-        packet_req = (Packet *)malloc(sizeof(Packet));
 
         /* accept Data from now on */
         while(1){
 
-            gettimeofday(&timer, &tzp);
-
             /* Receive packet_req from client */
             pthread_mutex_lock(&lockserver);
 
+            gettimeofday(&timer, &tzp);
+
+            Packet *packet_req, *packet_reply; // MUST use pointer to fit different Packet
+            packet_req = (Packet *)calloc(1, sizeof(Packet));
+
             Recv(sockfd, packet_req, sizeof(Packet), 0);
         
-            //printf("serverthread: packet_req->PacketType = %s \n", packet_req->PacketType);
+            //printf("serverthread(0x%x): got packet from %s with PacketType = %s \n", pthread_self(), packet_req->RouterID, packet_req->PacketType);
 
             int ethx = getEthx(router, packet_req->RouterID);
             /* Neighbor packet */
@@ -116,25 +116,30 @@ void *serverthread(void *arg){
             /* Hello packet */
             else if(strcmp(packet_req->PacketType, "001") == 0){
                 //sendHello(sockfd, router, threadParam->port);
+                //printf("serverthread: got hello packet from %s\n", packet_req->RouterID);
             }
             /* Ping packet */
             else if(strcmp(packet_req->PacketType, "011") == 0 ){
                 /* calculate link cost */
-                calCost(packet_req, router->ping_alpha, cost, timer);
+                //printf("serverthread: got ping packet from %s\n", packet_req->RouterID);
+                tmpcost = calCost(packet_req, router->ping_alpha, &cost, timer);
+                //cost.tv_sec = tmpcost->tv_sec;
+                //cost.tv_usec = tmpcost->tv_usec;
+
+                //printf("serverthread(0x%x): cost is: %d:%d\n", cost.tv_sec, cost.tv_usec);
                 router->ethx[ethx].link_cost = cost; // update router for LSA packet
             }
             /* LSA packet */
             else if(strcmp(packet_req->PacketType, "010") == 0){
-                printf("i'm here 1.\n");
                 /* use LSA to fill the LS Database */
-                installLSA(threadParam, packet_req, ethx); // installs the new LSA in its link state database.
-                printf("i'm here 2.\n");
+                //printf("serverthread: got LSA packet from %s\n", packet_req->RouterID);
+                //pthread_mutex_lock(&lockserver);
+                installLSA(threadParam, packet_req); // installs the new LSA in its link state database.
                 //genLSAACK(threadParam, packet_req);
                 //addBufferACK(threadParam, packet_req, ethx); // ready to send LSA ack
                 repackLSA(router, packet_req);
-                printf("i'm here 3.\n");
                 addBufferFlood(threadParam, packet_req, ethx); // except the ethx from which it received the LSA.
-                printf("i'm here 4.\n");
+                //pthread_mutex_unlock(&lockserver); // Critical section end
             }
             /* Data packet */
             else if(strcmp(packet_req->PacketType, "100") == 0){
@@ -144,7 +149,7 @@ void *serverthread(void *arg){
             }
    
             pthread_mutex_unlock(&lockserver); // Critical section end
-
+            sleep(1); // sleep some time or other thread do not have chance to get the lock
         }
 
     }
@@ -206,7 +211,7 @@ void *sockserver(void *arg){
     /* Thread attribute */
     pthread_attr_t attr;
     pthread_attr_init(&attr); // Creating thread attributes
-    pthread_attr_setschedpolicy(&attr, SCHED_FIFO); // FIFO scheduling for threads 
+    pthread_attr_setschedpolicy(&attr, SCHED_RR); // Round Robin scheduling for threads 
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED); // Don't want threads (particualrly main)
     int iThread = 0; // Thread iterator
 
@@ -258,7 +263,7 @@ void *sockserver(void *arg){
 
                     threadParam->sockfd = client_fd;
                     pthread_create(&threadid[i++], &attr, &serverthread, (void *)threadParam);
-                    sleep(0); // Giving threads some CPU time
+                    //sleep(1); // Giving threads some CPU time
                 }// end if (FD_ISSET(i, &ready_set))
         }// end switch
     } // end while (status==CONTINUE)
