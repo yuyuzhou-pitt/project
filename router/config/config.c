@@ -325,6 +325,27 @@ void cfgwrite(char filename[], char parameter[], char content[])
     fclose(tempfile);
 }
 
+int showHelp(){
+    printf("\nUsage: <subcommand> [options]\n");
+    printf("A user interface that can be used to properly configure the router parameters.\n\n");
+    printf("Subcommands:\n");
+    printf("  help      show these messages\n");
+    printf("  quit      stop this router and quit\n");
+    printf("  showlsdb  show link state database\n");
+
+    return 0;
+}
+
+int quitRouter(){
+    char confirm[4];
+    printf("This command will stop this router, please confirm: [y/N]");
+    scanf("%c", confirm);
+    if(strcmp(confirm, "y") == 0){
+        return 0;
+    }
+    return 1;
+}
+
 /*
 int main()
 {
