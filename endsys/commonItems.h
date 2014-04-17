@@ -54,10 +54,18 @@
 	int commonfunctions_checkCRC_pkt(struct packet pck);
 	int commonfunctions_checkSetRouter();
 	void commonItems_setErrorRate(int errorRate);
+	void commonItems_setDEBUG(int debug_val);
 
 	extern int MTU;
 	extern int edge_Port;
 	extern char edge_IP[17];
 	extern int timeout;
 	extern int errorRate;
+	extern int DEBUG;
+
+
+//DEBUG
+	void printPacketDEBUG(char* outOrIn, char* string);
+	void printDEBUG(char* string);
+
 #endif

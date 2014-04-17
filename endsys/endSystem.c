@@ -14,6 +14,9 @@ void readcfgs()
 
 int main( int argc, const char* argv[] )
 {
+	if(argc > 1)
+		commonItems_setDEBUG(atoi(argv[1]));
+
 	chksum_crc32gentab();
 	printf("STARTUP: CRC has been setup\n");
 

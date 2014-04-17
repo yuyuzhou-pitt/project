@@ -13,6 +13,7 @@
 #include <netinet/in.h>
 #include <stdio.h>
 #include <unistd.h> 
+#include <time.h>
 #include <errno.h>
 #include <sys/ioctl.h>
 #include "libsocket.h"

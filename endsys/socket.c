@@ -1,23 +1,5 @@
 /*************************************************************************/
-/* This program creates a well-known Internet domain socket.             */
-/* Each time it accepts a connection, it forks a child to print          */
-/* out a message from the client. It then goes on to accept new          */
-/* connections. The child executes recho.                                */
-/* To execute this program :                                             */
-/*                                                                       */
-/* At the local  machine:                                                */
-/* 1. cc -o ex6a ex6a.c OR gcc -o ex6a ex6a.c -lsocket                   */ 
-/* 2. cc -o recho ex6b.c OR gcc -o recho ex6b.c                          */
-/*                                                                       */
-/* At the remote machine:                                                */
-/* 3. cc -o ex6c ex6c.c OR gcc -o ex6c ex6c.c -lsocket -lnsl             */ 
-/* (-lsocket and -lnsl may not be required for gcc in all machines)      */
-/*                                                                       */
-/* local> ex6a (or ./ex6a)                                               */
-/*         socket has port 1892                                          */
-/*                      remote> ex6c (or ./ex6c) local.cs.pitt.edu 1892  */
-/* (where local.cs.pitt.edu represents the hostname running ex6a, such   */ 
-/*   as unixs4.cis.pitt.edu)                                             */
+/*	This requres -lsocket -lnsl when linking the object              */ 
 /*************************************************************************/
 #include "socket.h"
 #define BUFFER_SIZE 1024
@@ -166,6 +148,8 @@ char* convertPacketToChar(struct packet pkg)
 	memcpy(buffer + 98, pkg.data, atoi(pkg.length) + 1);
 	memcpy(buffer + 99 + atoi(pkg.length), pkg.packet_life, 5);
 	memcpy(buffer + 104 + atoi(pkg.length), pkg.checksum, 33);
+
+	printPacketDEBUG("Outgoing Data",buffer);
 	return buffer;
 }
 
@@ -181,6 +165,8 @@ struct packet convertCharToPacket(char* buffer)
 	memcpy(pkg.data, buffer + 98, atoi(pkg.length) + 1);
 	memcpy(pkg.packet_life,buffer + 99 + atoi(pkg.length), 5);
 	memcpy(pkg.checksum,buffer + 104 + atoi(pkg.length), 33);
+
+	printPacketDEBUG("Incoming Data",buffer);
 	free(buffer);
 	return pkg;
 }
@@ -292,14 +278,14 @@ void socket_sendFile(char * hostname, int port, struct packet pkg)
     else
     {
 	int i = 0;
-	while( i < timeout)
+	while( i < timeout*10)
 	{
 	int status;
 	if(waitpid(pid, &status, WNOHANG)  > 0){
 		cont = 0;
 		break;
 	}
-	sleep(1); //timeout
+	usleep(100); //timeout
 	i++;
 	}
 	if(cont == 1)
