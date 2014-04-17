@@ -86,7 +86,7 @@ int Recvfrom(int sockfd, Packet *packet, int size, int flag, struct sockaddr_in 
         perror("recvfrom");
         return -1;
     }    
-    char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "Recvfrom message: %s\n", packet);
+    char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "Recvfrom message: %s\n", packet->RouterID);
     logging(LOGFILE, logmsg);
     return recvbytes;
 }
@@ -98,7 +98,7 @@ int Sendto(int sockfd, Packet *packet, int size, int flag, struct sockaddr_in so
         perror("sendto");
         return -1;
     }
-    char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "Sendto message: %s\n", packet);
+    char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "Sendto message: %s\n", packet->RouterID);
     logging(LOGFILE, logmsg);
     return sendbytes;
 }
@@ -110,8 +110,8 @@ int Recv(int sockfd, Packet *packet, int size, int flag){
         perror("recv");
         return -1;
     }
-    char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "Recv message from: %s\n", packet->RouterID);
-    logging(LOGFILE, logmsg);
+    //char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "Recv message from: %s\n", packet->RouterID);
+    //logging(LOGFILE, logmsg);
     return recvbytes;
 }
 

@@ -18,11 +18,9 @@
 #include "libsocket.h"
 #include "getaddrinfo.h"
 #include "../packet/hello.h"
+#include "../packet/libqueue.h"
 #include "../config/config.h"
 #include "../config/liblog.h"
-
-#define NEIGHBOR 1
-#include "../packet/neighbor.h"
 
 #define PORT 0 //0 means assign a port randomly
 #define BUFFER_SIZE  1024
@@ -33,7 +31,7 @@
 //#define LSRPCFG "config/lsrp-router.cfg"
 
 pthread_t threadid[NTHREADS]; // Thread pool
-pthread_mutex_t lock;
+pthread_mutex_t lockserver = PTHREAD_MUTEX_INITIALIZER;
 int counter = 0;
 
 //char *lsrpcfg = "lsrp-router.cfg";
@@ -47,7 +45,6 @@ void *serverthread(void *arg){
 
     /* Getting sockfd and router from void arg passed in */
     ThreadParam *threadParam;
-    threadParam = (ThreadParam *)malloc(sizeof(ThreadParam));
     threadParam = (ThreadParam *) arg;
     int sockfd = threadParam->sockfd;
     Router *router;
@@ -65,36 +62,104 @@ void *serverthread(void *arg){
     Recv(sockfd, neighbor_req, sizeof(Packet), 0);
 
     /* generate neighbors_reply reply according to configure file */
-    neighbor_reply = genNeighborReq(router, addrstr, port); // msg to be sent back
+    neighbor_reply = genNeighborReq(router, threadParam->port); // msg to be sent back
     genNeighborReply(router, neighbor_req, neighbor_reply); // update the Neighbor Acquisition Type
     Send(sockfd, neighbor_reply, sizeof(Packet), 0);
 
-    char logmsg[128]; 
 
     /* if neighbor request confirmed:
      * 1) exchange alive (hello) message in HelloInterval seconds
      * 2) exchange LSA message in UpdateInterval seconds, or every time there is updates
      *     */
 
+    char logmsg[128]; 
+    snprintf(logmsg, sizeof(logmsg), "serverthread(0x%x): reply neighbor acq type: %s\n", \
+                                      pthread_self(), neighbor_reply->Data.NeighborAcqType);
+    logging(LOGFILE, logmsg);
+
     if(strcmp(neighbor_reply->Data.NeighborAcqType, "001") == 0){
-        snprintf(logmsg, sizeof(logmsg), "serverthread(0x%x): reply neighbor acq type: %s\n", \
-                                          pthread_self(), neighbor_reply->Data.NeighborAcqType);
-        logging(LOGFILE, logmsg);
+
+        /* internal buffer, do not exchange to other routers */
+        //Packet_Buff *neighbor_buff, *hello_buff, *lsa_buff, *ping_buff;
+        
         /* use a thread to keep alive */
-        pthread_t hellothreadid;
-        pthread_create(&hellothreadid, NULL, &helloserver, (void *) sockfd);
+        //pthread_t hellothreadid;
+        //pthread_create(&hellothreadid, NULL, &helloserver, (void *) sockfd);
 
         /* use another thread for LSA */
         //pthread_t LSAthreadid;
         //pthread_create(&LSAthreadid, NULL, &LSAserver, (void *) sockfd);
+
+        struct timeval *tmpcost, cost, timer; // use high quality timer to calculate the ping cost
+        struct timezone tzp;
+
+        /* accept Data from now on */
+        while(1){
+
+            /* Receive packet_req from client */
+            pthread_mutex_lock(&lockserver);
+
+            gettimeofday(&timer, &tzp);
+
+            Packet *packet_req, *packet_reply; // MUST use pointer to fit different Packet
+            packet_req = (Packet *)calloc(1, sizeof(Packet));
+
+            Recv(sockfd, packet_req, sizeof(Packet), 0);
+        
+            //printf("serverthread(0x%x): got packet from %s with PacketType = %s \n", pthread_self(), packet_req->RouterID, packet_req->PacketType);
+
+            int ethx = getEthx(router, packet_req->RouterID);
+            /* Neighbor packet */
+            if(strcmp(packet_req->PacketType, "000") == 0){
+                //sendNeighborReply(sockfd, packet_req, router, threadParam->port);
+            }
+            /* Hello packet */
+            else if(strcmp(packet_req->PacketType, "001") == 0){
+                //sendHello(sockfd, router, threadParam->port);
+                //printf("serverthread: got hello packet from %s\n", packet_req->RouterID);
+            }
+            /* Ping packet */
+            else if(strcmp(packet_req->PacketType, "011") == 0 ){
+                /* calculate link cost */
+                //printf("serverthread: got ping packet from %s\n", packet_req->RouterID);
+                tmpcost = calCost(packet_req, router->ping_alpha, &cost, timer);
+                //cost.tv_sec = tmpcost->tv_sec;
+                //cost.tv_usec = tmpcost->tv_usec;
+
+                //printf("serverthread(0x%x): cost is: %d:%d\n", cost.tv_sec, cost.tv_usec);
+                router->ethx[ethx].link_cost = cost; // update router for LSA packet
+            }
+            /* LSA packet */
+            else if(strcmp(packet_req->PacketType, "010") == 0){
+                /* use LSA to fill the LS Database */
+                //printf("serverthread: got LSA packet from %s\n", packet_req->RouterID);
+                //pthread_mutex_lock(&lockserver);
+                installLSA(threadParam, packet_req); // installs the new LSA in its link state database.
+                //genLSAACK(threadParam, packet_req);
+                //addBufferACK(threadParam, packet_req, ethx); // ready to send LSA ack
+                repackLSA(router, packet_req);
+                addBufferFlood(threadParam, packet_req, ethx); // except the ethx from which it received the LSA.
+                //pthread_mutex_unlock(&lockserver); // Critical section end
+            }
+            /* Data packet */
+            else if(strcmp(packet_req->PacketType, "100") == 0){
+                // data, addBuff();
+                //Thans_Data trans_data = (Trans_Data)packet->Data;
+                //getEthx(router, trans_data.des_ip); // calculate the out interface according to the routing table
+            }
+   
+            pthread_mutex_unlock(&lockserver); // Critical section end
+            sleep(1); // sleep some time or other thread do not have chance to get the lock
+        }
+
     }
 
-    sleep(3600);
+    //sleep(3600);
 
     /* Critical section */
-    pthread_mutex_lock (&lock);
+    pthread_mutex_lock(&lockserver);
     counter++;
-    pthread_mutex_unlock (&lock);
+    pthread_mutex_unlock(&lockserver);
   
     close(sockfd);
     snprintf(logmsg, sizeof(logmsg), "serverthread(0x%x): served request, exiting thread\n", pthread_self());
@@ -107,8 +172,7 @@ void *serverthread(void *arg){
 /* thread for lsrp-server main */
 void *sockserver(void *arg){
     ThreadParam *threadParam;
-    threadParam = (ThreadParam *)malloc(sizeof(ThreadParam));
-    threadParam->router = (Router *)arg;
+    threadParam = (ThreadParam *)arg;
 
     struct sockaddr_in server_sockaddr, client_sockaddr;
     int sin_size, recvbytes, sendbytes;
@@ -139,6 +203,7 @@ void *sockserver(void *arg){
 
     getaddr(hostname, addrstr); //get hostname and ip, getaddrinfo.h
     port = Getsockname(sockfd, server_sockaddr, sin_size);  /* Get the port number assigned*/
+    threadParam->port = port;
     writePort(port, addrstr);
     
     Listen(sockfd, MAX_QUE_CONN_NM);
@@ -146,7 +211,7 @@ void *sockserver(void *arg){
     /* Thread attribute */
     pthread_attr_t attr;
     pthread_attr_init(&attr); // Creating thread attributes
-    pthread_attr_setschedpolicy(&attr, SCHED_FIFO); // FIFO scheduling for threads 
+    pthread_attr_setschedpolicy(&attr, SCHED_RR); // Round Robin scheduling for threads 
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED); // Don't want threads (particualrly main)
     int iThread = 0; // Thread iterator
 
@@ -198,7 +263,7 @@ void *sockserver(void *arg){
 
                     threadParam->sockfd = client_fd;
                     pthread_create(&threadid[i++], &attr, &serverthread, (void *)threadParam);
-                    sleep(0); // Giving threads some CPU time
+                    //sleep(1); // Giving threads some CPU time
                 }// end if (FD_ISSET(i, &ready_set))
         }// end switch
     } // end while (status==CONTINUE)

@@ -16,6 +16,18 @@ eth0_ip and eth0_ip_direct can not be used at the same time.
 #include"config.h"
 #include"liblog.h"
 
+int getEthx(Router *router, char *direct_link_addr){
+    int iEthx = -1;
+    int i;
+    for(i=0;i < router->num_of_interface;i++){
+        if(strcmp(router->ethx[i].direct_link_addr, direct_link_addr)==0){
+            iEthx = i;
+        }
+    }
+
+    return iEthx;
+}
+
 Router *getRouter(char *filename){
     FILE *fp;
     char *line = NULL;
@@ -66,6 +78,12 @@ Router *getRouter(char *filename){
         if(strcmp(strstrip(tmp_param), "hello_interval") == 0){
             router->hello_interval = atoi(strstrip(tmp_value));
         }
+        if(strcmp(strstrip(tmp_param), "ping_interval") == 0){
+            router->ping_interval = atoi(strstrip(tmp_value));
+        }
+        if(strcmp(strstrip(tmp_param), "ping_alpha") == 0){
+            router->ping_alpha = atoi(strstrip(tmp_value));
+        }
         if(strcmp(strstrip(tmp_param), "ping_timeout") == 0){
             router->ping_timeout = atoi(strstrip(tmp_value));
         }
@@ -88,11 +106,14 @@ Router *getRouter(char *filename){
         if(strcmp(strstrip(tmp_param), "direct_link_addr") == 0){
             snprintf(router->ethx[interface].direct_link_addr, sizeof(router->ethx[interface].direct_link_addr), "%s", strstrip(tmp_value));
         }
+        if(strcmp(strstrip(tmp_param), "link_availability") == 0){
+            router->ethx[interface].link_availability = atoi(strstrip(tmp_value));
+        }
         if(strcmp(strstrip(tmp_param), "link_cost_method") == 0){
             snprintf(router->ethx[interface].link_cost_method, sizeof(router->ethx[interface].link_cost_method), "%s", strstrip(tmp_value));
         }
         if(strcmp(strstrip(tmp_param), "link_cost") == 0){
-            router->ethx[interface].link_cost = atoi(strstrip(tmp_value));
+            router->ethx[interface].link_cost.tv_sec = atoi(strstrip(tmp_value)); //struct timeval link_cost 
         }
         if(strcmp(strstrip(tmp_param), "link_failure_time") == 0){
             router->ethx[interface].link_failure_time = atoi(strstrip(tmp_value));
@@ -122,12 +143,15 @@ int writeRouter(char *filename, Router *router){
     snprintf(routerStr, sizeof(routerStr), "\
 # NOTE: 1) please update num_of_interface when adding new interfaces \n\
 #       2) value does NOT have \"\" even it's a string type \n\
+#       3) eth_id identifies the link, set it UNIQUE please \n\
 \n\
 [Global config]\n\
 router_id = %s\n\
 protocol_version = %s\n\
 acquisition_authorization = %s\n\
 hello_interval = %d # in seconds\n\
+ping_interval = %d # 60 seconds\n\
+ping_alpha = %d # to calculate the average ping cost\n\
 ping_timeout = %d # in seconds\n\
 ls_updated_interval = %d # in seconds\n\
 ls_age_limit = %d #in seconds\n\
@@ -136,7 +160,8 @@ num_of_interface = %d\n\
 \n\
 [interface config]\n\
 ", router->router_id, router->protocol_version, router->acquisition_authorization, \
-    router->hello_interval, router->ping_timeout, router->ls_updated_interval, \
+    router->hello_interval, router->ping_interval, router->ping_alpha, \
+    router->ping_timeout, router->ls_updated_interval, \
     router->ls_age_limit, router->hold_down_timer, router->num_of_interface);
 
 
@@ -147,14 +172,15 @@ num_of_interface = %d\n\
         memset(ethxStr, 0, sizeof(ethxStr));
         snprintf(ethxStr, sizeof(ethxStr), "\
 [eth%d]\n\
-eth_id = %s\n\
+eth_id = %s # identifies the link, set it UNIQUE \n\
 direct_link_addr = %s # remote host ip (router_id)\n\
+link_availability = %d # default is avail\n\
 link_cost_method = %s # auto - calculated by  ping delay, manual - manual setting\n\
 link_cost = %d # infinit\n\
 link_failure_time = %d # seconds\n\
 packet_error_rate = %d\n\
 \n\
-", i, router->ethx[i].eth_id, router->ethx[i].direct_link_addr, router->ethx[i].link_cost_method, \
+", i, router->ethx[i].eth_id, router->ethx[i].direct_link_addr, router->ethx[i].link_availability, router->ethx[i].link_cost_method, \
     router->ethx[i].link_cost, router->ethx[i].link_failure_time, router->ethx[i].packet_error_rate);
 
        strcat(routerStr, ethxStr); // add ethx information to router
@@ -297,6 +323,27 @@ void cfgwrite(char filename[], char parameter[], char content[])
     logging(LOGFILE, logmsg);
     fclose(fp);
     fclose(tempfile);
+}
+
+int showHelp(){
+    printf("\nUsage: <subcommand> [options]\n");
+    printf("A user interface that can be used to properly configure the router parameters.\n\n");
+    printf("Subcommands:\n");
+    printf("  help      show these messages\n");
+    printf("  quit      stop this router and quit\n");
+    printf("  showlsdb  show link state database\n");
+
+    return 0;
+}
+
+int quitRouter(){
+    char confirm[4];
+    printf("This command will stop this router, please confirm: [y/N]");
+    scanf("%c", confirm);
+    if(strcmp(confirm, "y") == 0){
+        return 0;
+    }
+    return 1;
 }
 
 /*
