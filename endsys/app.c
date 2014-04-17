@@ -70,7 +70,7 @@ struct message message_encapsulation_first(char* DEST_FILE)
 	return message;
 }
 
-struct message message_encapsulation(struct metadata MD, int frag)
+struct message message_encapsulation(struct metadata MD, int dataPos)
 {
 	FILE *fp;
 	char line[81];
@@ -78,7 +78,7 @@ struct message message_encapsulation(struct metadata MD, int frag)
 	message.data = (char *)malloc(MTU + 1);
   	memset(message.data, 0, MTU + 1);
 	fp = fopen(MD.name, "r");
-	fseek(fp, frag*MTU, SEEK_SET);
+	fseek(fp, dataPos, SEEK_SET);
 
 	int maxLeft = MTU + 1;
 	int lineLength = 81;
@@ -88,7 +88,7 @@ struct message message_encapsulation(struct metadata MD, int frag)
 	while(fgets(line, lineLength, fp) != NULL && maxLeft != 0)
    	{
 		strncat(message.data, line, strlen(line));
-		maxLeft -= lineLength;
+		maxLeft -= strlen(line);
 		if(maxLeft < 81)
 			lineLength = maxLeft + 1;
    	}
@@ -102,11 +102,11 @@ struct message message_encapsulation(struct metadata MD, int frag)
 	return message;
 }
 
-void message_decapsulation(struct metadata MD, struct message msg, int frag)
+void message_decapsulation(struct metadata MD, struct message msg, int pos)
 {
 	FILE *fp;
 	fp = fopen(MD.name, "a");
-	fseek(fp, frag*MTU, SEEK_SET);
+	fseek(fp, pos, SEEK_SET);
 	fputs(msg.data, fp);
 	fclose(fp);
 }
@@ -121,6 +121,8 @@ struct metadata message_decapsulation_first(struct message msg)
 	return file;
 }
 
+int sent_data = 0;
+
 void app_outgoingFile(char filename[FILENAMESIZE], char* DEST_FILE, char * IP)
 {
 	struct metadata file;
@@ -133,16 +135,18 @@ void app_outgoingFile(char filename[FILENAMESIZE], char* DEST_FILE, char * IP)
 
 	for(int i = 0; i < file.fragments; i++)
 	{
-		struct message temp_message = message_encapsulation(file, i);
+		struct message temp_message = message_encapsulation(file, sent_data);
 		if(i + 1 == file.fragments)
 			strcpy(temp_message.end_flag,"1");
 		sw_outgoingmessage(temp_message, atoi(temp_message.length) + 63 + 1, IP);	
+		sent_data +=atoi(temp_message.length);
 	}
+	sent_data = 0;
 	printf("File Sent: %s\n", file.name);
 }
 
 struct metadata* recieved = NULL;
-int recieved_pos = 0;
+int recieved_data = 0;
 
 int app_incomingFile(struct message msg)
 {
@@ -159,13 +163,13 @@ int app_incomingFile(struct message msg)
 	}
 	else
 	{
-		message_decapsulation(*recieved, msg, recieved_pos);
-		recieved_pos++;
+		message_decapsulation(*recieved, msg, recieved_data);
+		recieved_data += atoi(msg.length);
 		if(msg.end_flag[0] == '1')
 		{
 			printf("File Recieved: %s\n", (*recieved).name);
 			free(recieved);
-			recieved_pos = 0;
+			recieved_data = 0;
 		}
 		free(msg.data);
 	}
