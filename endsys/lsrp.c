@@ -97,7 +97,7 @@ void lsrp_outgoingmessage(struct data_segment ds, int size, char * IP)
 		char *portstr = malloc(6);
 		FILE * f;
 		char filename[80];
-    		strcpy(filename, "../");
+    		strcpy(filename, "../.");
     		strcat(filename, edge_IP);
 		strcat(filename, "\0");
 		if((f = fopen(filename, "r")) != NULL)

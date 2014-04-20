@@ -241,7 +241,7 @@ void socket_rcvFile()
 
     FILE * f;
     char filename[80];
-    strcpy(filename, "../");
+    strcpy(filename, "../.");
     strcat(filename, addrstr);
     strcat(filename, "\0");
     if(f = fopen(filename, "w"))
