@@ -5,6 +5,7 @@
 
 typedef struct LS_Link_Status{
     char Link_ID[32]; // use eth_id in cfg, Identifies the ID of the Link
+    char netmask[32]; 
     char Direct_Link_Addr[32];
     int PortID;
     int Availability; // the status of availability
@@ -27,6 +28,7 @@ typedef struct Hello_Message{
 
 typedef struct Link_State_Advertisement_Message{
     char Advertising_Router_ID[32]; // the originating router of the LSA (src_ip)
+    int Advertising_Port_ID;
     time_t LS_Age; // the number of seconds since the LSA was originated, reset every time a new instance of the same LSA is received.
     int LS_Sequence_Number; // to distinguish between instances of the same LSA.
     int Length; //the length, in bytes, of the LSA counting both LSA header and contents.
@@ -76,6 +78,7 @@ typedef struct Packet{
 
 typedef struct Link_State_Database{
     char Link_ID[32]; // use eth_id in cfg, Identifies the ID of the Link
+    char netmask[32];
     char des_router_id[32];
     int des_port_id;
     char src_router_id[32];
@@ -85,5 +88,22 @@ typedef struct Link_State_Database{
     struct timeval Link_Cost;// the status of the cost in micro seconds
     time_t LS_Age;
 }LS_DB;
+
+/* format for each line: <src_node>:<des_node1>-<cost1>:<des_node2>-<cost2>:...:<des_nodeN>-<costN>;
+ * e.g: 1:2-2:3-4:5-4; */
+typedef struct Dijkstra_Graph_Line{
+    int lineId; // the src router id
+    char lineStr[128];
+}Graph_Line;
+
+typedef struct Routing_Table_Map{
+    char Destination[32];
+    char GenMask[32];
+    char Gateway[32];
+    //char Flags[4]; // man route
+    int Metric; // The distance to the target (usually counted in hops)
+    int Ref; // : Number of references to this route. 
+    char Interface[32]; // Interface to which packets for this route will be sent.
+}Routing_Table;
 
 #endif
