@@ -61,9 +61,12 @@ struct timeval *calCost(Packet *packet_req, int alpha, struct timeval *cost, str
     //printf("calCost: raw cost is: %d:%d\n", current_cost.tv_sec, current_cost.tv_usec);
     /* update routing table */
 
+    if(current_cost.tv_sec < 0) current_cost.tv_sec = 0;
+    if(current_cost.tv_usec < 0) current_cost.tv_usec = 0;
+
     cost->tv_sec = alpha * cost->tv_sec + (1 -  alpha) * current_cost.tv_sec;
     cost->tv_usec = alpha * cost->tv_usec + (1 -  alpha) * current_cost.tv_usec;
-    printf("calCost: real cost is: %d:%d\n", cost->tv_sec, cost->tv_usec);
+    //printf("calCost: real cost is: %d:%d\n", cost->tv_sec, cost->tv_usec);
     
     return cost;
 }
