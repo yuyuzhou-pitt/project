@@ -110,6 +110,7 @@ void *sockclient(void *arg){
 
                 if(portFound == 1){
                     snprintf(remote_server, sizeof(remote_server), "%s", router->ethx[iEthx].direct_link_addr);
+                    router->ethx[iEthx].direct_link_port = atoi(portstr);
                     if((host = gethostbyname(router->ethx[iEthx].direct_link_addr)) == NULL ) { // got the remote server
                         perror("gethostbyname");
                         exit(-1);
@@ -242,7 +243,7 @@ void *sockclient(void *arg){
                     /* TODO: check acknowledgment, keep sending if no ack */
                     pthread_mutex_lock(&lock_send); // Critical section to read port files
                     //printf("sockclient(0x%x): send LSA packet from %s to %s\n", pthread_self(), addrstr, remote_server);
-                    sendNewLSA(clientfd, threadParam, ls_sequence_number, timer, atoi(portstr));
+                    sendNewLSA(clientfd, threadParam, ls_sequence_number, timer);
                     pthread_mutex_unlock(&lock_send); // Critical section end
 
                     //sendNewLSA(clientfd, router, ls_sequence_number, timer, atoi(portstr), remote_server);
@@ -258,6 +259,7 @@ void *sockclient(void *arg){
 
             /* read data from buffer */
             pthread_mutex_lock(&lock_buffer);
+            //printf("sockclient(0x%x): threadParam->buffer[%d].buffsize: %d\n", pthread_self(), ethx, threadParam->buffer[ethx].buffsize);
             if(threadParam->buffer[ethx].buffsize > 0){
                 /* p *threadParam
                 $14 = {sockfd = 8, port = 46976, router = 0x608250, ls_db_size = 1, ls_db = {{Link_ID = "a", '\000' <repeats 30 times>, 
@@ -294,7 +296,7 @@ void *sockclient(void *arg){
                 /* LSA packet */
                 else if(strcmp(threadParam->buffer[ethx].packet_q->next->packet->PacketType, "010") == 0){
                     //printf("sockclient: threadParam->buffer[ethx].buffsize=%d\n", threadParam->buffer[ethx].buffsize);
-                    sendBufferLSA(clientfd, threadParam->buffer[ethx]);
+                    sendBufferLSA(clientfd, &threadParam->buffer[ethx]);
                 }
                 /* Data packet */
                 else if(strcmp(threadParam->buffer[ethx].packet_q->next->packet->PacketType, "100") == 0){
@@ -303,13 +305,14 @@ void *sockclient(void *arg){
 
             }
             pthread_mutex_unlock(&lock_buffer);
+            usleep(1); //sleep some time for lock relase
  
             /* Receive packet_req from server */
             //packet_reply = (Packet *)malloc(sizeof(Packet));
             //Recv(clientfd, packet_reply, sizeof(Packet), 0);
 
             /* do nothing after receive packet from server ?? */
-        }
+        } //endof while(1)
 
     }
 
