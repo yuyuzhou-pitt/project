@@ -127,17 +127,6 @@ int Send(int sockfd, Packet *packet, int size, int flag){
     return sendbytes;
 }
 
-/*wrap ioctl*/
-int Ioctl(int sockfd, int request, int i){
-    /* Set socket to be non-blocking. */
-    int n;
-    if((n = ioctl(sockfd, FIONBIO, (char *)&i)) < 0){
-        perror("ioctl");
-        exit(-1);
-    }
-    return n;
-}
-
 /*wrap connect*/
 int Connect(int sockfd, struct sockaddr_in sockaddr, int sin_size){
     int n;
@@ -219,7 +208,7 @@ int writePort(int port, char *hostip){
     char hostfile[17];
     memset(hostfile, 0, sizeof(hostfile));
 
-    strcpy(hostfile, ".");
+    strcpy(hostfile, "../.");
     strcat(hostfile, hostip);
 
     if(writeFile(portstr, sizeof(portstr), hostfile) < 0){
@@ -236,7 +225,7 @@ int writePort(int port, char *hostip){
 int getPort(char *portstr, int size, char *ipfile){
     char hostfile[17];
     memset(hostfile, 0, sizeof(hostfile));
-    strcpy(hostfile, ".");
+    strcpy(hostfile, "../.");
     strcat(hostfile, ipfile);
 
     if(readFile(portstr, size, hostfile) < 0){
@@ -254,7 +243,7 @@ int markPort(char *filename, char *newline){
     char hostfile[17];
     memset(hostfile, 0, sizeof(hostfile));
 
-    strcpy(hostfile, ".");
+    strcpy(hostfile, "../.");
     strcat(hostfile, filename);
 
     if(writeFile(newline, strlen(newline), hostfile) < 0){
