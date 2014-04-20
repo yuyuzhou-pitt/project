@@ -103,6 +103,9 @@ Router *getRouter(char *filename){
             interface++; // index start from 0
             snprintf(router->ethx[interface].eth_id, sizeof(router->ethx[interface].eth_id), "%s", strstrip(tmp_value));
         }
+        if(strcmp(strstrip(tmp_param), "netmask") == 0){
+            snprintf(router->ethx[interface].netmask, sizeof(router->ethx[interface].netmask), "%s", strstrip(tmp_value));
+        }
         if(strcmp(strstrip(tmp_param), "direct_link_addr") == 0){
             snprintf(router->ethx[interface].direct_link_addr, sizeof(router->ethx[interface].direct_link_addr), "%s", strstrip(tmp_value));
         }
@@ -138,7 +141,7 @@ int writeRouter(char *filename, Router *router){
         return -1;
     }
 
-    char routerStr[2048];
+    char routerStr[8192];
     memset(routerStr, 0, sizeof(routerStr));
     snprintf(routerStr, sizeof(routerStr), "\
 # NOTE: 1) please update num_of_interface when adding new interfaces \n\
@@ -173,6 +176,7 @@ num_of_interface = %d\n\
         snprintf(ethxStr, sizeof(ethxStr), "\
 [eth%d]\n\
 eth_id = %s # identifies the link, set it UNIQUE \n\
+netmask = %s # netmask of the link \n\
 direct_link_addr = %s # remote host ip (router_id)\n\
 link_availability = %d # default is avail\n\
 link_cost_method = %s # auto - calculated by  ping delay, manual - manual setting\n\
@@ -180,8 +184,9 @@ link_cost = %d # infinit\n\
 link_failure_time = %d # seconds\n\
 packet_error_rate = %d\n\
 \n\
-", i, router->ethx[i].eth_id, router->ethx[i].direct_link_addr, router->ethx[i].link_availability, router->ethx[i].link_cost_method, \
-    router->ethx[i].link_cost, router->ethx[i].link_failure_time, router->ethx[i].packet_error_rate);
+", i, router->ethx[i].eth_id, router->ethx[i].netmask, router->ethx[i].direct_link_addr, \
+       router->ethx[i].link_availability, router->ethx[i].link_cost_method, \
+       router->ethx[i].link_cost, router->ethx[i].link_failure_time, router->ethx[i].packet_error_rate);
 
        strcat(routerStr, ethxStr); // add ethx information to router
     }
