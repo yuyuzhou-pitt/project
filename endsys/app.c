@@ -132,8 +132,8 @@ void app_outgoingFile(char filename[FILENAMESIZE], char* DEST_FILE, char * IP)
 
 	struct message msg1 = message_encapsulation_first(DEST_FILE);	
 	sw_outgoingmessage(msg1, atoi(msg1.length) + 63 + 1, IP);
-
-	for(int i = 0; i < file.fragments; i++)
+	int i = 0;
+	for(; i < file.fragments; i++)
 	{
 		struct message temp_message = message_encapsulation(file, sent_data);
 		if(i + 1 == file.fragments)
