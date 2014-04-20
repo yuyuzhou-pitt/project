@@ -11,9 +11,16 @@ void commonItems_setMTU(int MTU_temp)
 	MTU = MTU_temp;
 }
 
-void commonItems_setEdgeRouter(int port, char IP[33])
+void commonItems_setEdgeRouter(int port, char IP[32])
 {
 	edge_Port = port;
+	memset(edge_IP, '0',32);
+	memcpy(edge_IP, IP, sizeof(edge_IP));
+}
+
+void commonItems_setEdgeIP(char IP[32])
+{
+	edge_Port = -1;
 	memset(edge_IP, '0',32);
 	memcpy(edge_IP, IP, sizeof(edge_IP));
 }

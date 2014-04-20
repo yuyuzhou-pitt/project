@@ -143,7 +143,7 @@ int writeFile(char *str, int size, char *file){
     if ((fp = fopen(file,"w")) < 0){
         char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "writefile: Failed to open file: %s\n", file);
         logging(LOGFILE, logmsg);
-        return;
+        return -1;
     }
 
     if((fwrite(str, 1, size, fp))<0){
@@ -159,17 +159,17 @@ int writeFile(char *str, int size, char *file){
 /*read file*/
 int readFile(char *str, int size, char *file){
     FILE *fp;
-
+/*
     if(access(file, F_OK) < 0) {
         char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "readfile: File not found: %s\n", file);
         logging(LOGFILE, logmsg);
         return -1;
-    }
+    }*/
 
     if ((fp = fopen(file,"r")) < 0){
         char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "readfile: Failed to open file: %s\n", file);
         logging(LOGFILE, logmsg);
-        return;
+        return -1;
     }
 
     if((fgets(str, size, fp))<0){
@@ -208,7 +208,7 @@ int writePort(int port, char *hostip){
     char hostfile[17];
     memset(hostfile, 0, sizeof(hostfile));
 
-    strcpy(hostfile, ".");
+    //strcpy(hostfile, ".");
     strcat(hostfile, hostip);
 
     if(writeFile(portstr, sizeof(portstr), hostfile) < 0){
@@ -225,7 +225,7 @@ int writePort(int port, char *hostip){
 int getPort(char *portstr, int size, char *ipfile){
     char hostfile[17];
     memset(hostfile, 0, sizeof(hostfile));
-    strcpy(hostfile, ".");
+    //strcpy(hostfile, ".");
     strcat(hostfile, ipfile);
 
     if(readFile(portstr, size, hostfile) < 0){

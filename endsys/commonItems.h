@@ -47,7 +47,8 @@
 
 
 	void commonItems_setMTU(int MTU_temp);
-	void commonItems_setEdgeRouter(int port, char IP[15]);
+	void commonItems_setEdgeRouter(int port, char IP[32]);
+	void commonItems_setEdgeIP(char IP[32]);
 	void commonItems_setTimeout(int time);
 	void commonItems_displaysettings();
 	int commonfunctions_checkCRC(struct message msg);

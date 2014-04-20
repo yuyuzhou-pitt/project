@@ -91,6 +91,41 @@ void lsrp_outgoingmessage(struct data_segment ds, int size, char * IP)
 {
 	struct packet pck = packet_encapsulation(ds, size, IP);
 	packet_causeError(&pck);
+
+	if(edge_Port == -1)
+	{
+		char *portstr = malloc(6);
+		FILE * f;
+		char filename[80];
+    		strcpy(filename, "../");
+    		strcat(filename, edge_IP);
+		strcat(filename, "\0");
+		if((f = fopen(filename, "r")) != NULL)
+		{
+			fseek(f, 0, SEEK_SET);
+			if(fgets(portstr, 6, f) != NULL)
+			{
+				edge_Port = atoi(portstr);
+				fclose(f);
+			}
+			else
+			{
+				fclose(f);
+				printf("ERROR: Could not read port number \n");
+				exit(-1);
+			}
+		}
+		else
+		{
+			printf("ERROR: Could not open port number file\n");
+			exit(-1);
+		}
+	}
+	if(edge_Port == -1) //Check to see if it is still -1. Means there is an error
+	{
+		printf("ERROR: Could not determine Port number from IP %s",edge_IP);
+		exit(0);
+	}
 	socket_sendFile(edge_IP, edge_Port, pck);
 }
 
@@ -118,13 +153,20 @@ void lsrp_readInCfg()
       		{
 			if(line[0]!='#')
 			{
-        			if(strstr(line,"packet_error_rate"))
+        			if(strstr(line,"packet_error_rate") != NULL)
 				{
 					char *n;
 					n = strtok(line, "=");
 					n = strtok(NULL, "=");
 					int packetError = atoi(n);
 					commonItems_setErrorRate(packetError);
+				}
+				if(strstr(line,"ech0_direct_link_addr") != NULL)
+				{
+					line[strlen(line)-1] = 0;
+					char IP_address[32];
+					memcpy(IP_address, line + 22, sizeof(IP_address));
+					commonItems_setEdgeIP(IP_address);
 				}
 			}
       		}

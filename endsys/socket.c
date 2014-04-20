@@ -3,7 +3,7 @@
 /*************************************************************************/
 #define TRANSFILE 1
 #include "socket.h"
-#define BUFFER_SIZE 1024
+#define BUFFER_SIZE 1024 
 
 
 int socket_printIP()
@@ -238,7 +238,20 @@ void socket_rcvFile()
     getaddr(hostname, addrstr); //get hostname and ip
     port = Getsockname(sockfd, server_sockaddr, sin_size);  /* Get the port number assigned*/
     sprintf(str, "%d", port); // int to str
-    
+
+    FILE * f;
+    char filename[80];
+    strcpy(filename, "../");
+    strcat(filename, addrstr);
+    strcat(filename, "\0");
+    if(f = fopen(filename, "w"))
+    {
+        fputs(str,f);
+	 fclose(f);
+    }
+    else
+        printf("ERROR: Writing port to file\n");
+
     Listen(sockfd, 5);
     printf("STARTUP: Server is setup on port %d\n", port);
     if(fork() == 0)
@@ -277,7 +290,6 @@ void socket_sendFile(char * hostname, int port, struct packet pkg)
         perror("gethostbyname");
         exit(1);
     }
-
     /*create socket*/
     sockfd = Socket(AF_INET, SOCK_STREAM, 0);
 
@@ -286,10 +298,8 @@ void socket_sendFile(char * hostname, int port, struct packet pkg)
     sockaddr.sin_port = htons(port);
     sockaddr.sin_addr = *((struct in_addr *)host->h_addr);
     bzero(&(sockaddr.sin_zero), 8);         
-
     /*connect to server*/
     Connect(sockfd,sockaddr,sizeof(sockaddr));
-
     /*send message*/
     int pid = 0;
     int cont = 1;

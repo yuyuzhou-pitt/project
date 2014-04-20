@@ -16,5 +16,7 @@ int Send(int sockfd, Packet *packet, int size, int flag);
 int Connect(int sockfd, struct sockaddr_in sockaddr, int sin_size);
 int writeFile(char *str, int size, char *file);
 int readFile(char *str, int size, char *file);
+int writePort(int port, char *hostip);
+int getPort(char *portstr, int size, char *ipfile);
 
 #endif 
