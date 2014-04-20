@@ -66,8 +66,9 @@ int main(int argc, char *argv[]){
     }
 
     ThreadParam *threadParam;
-    threadParam = (ThreadParam *)malloc(sizeof(ThreadParam));
+    threadParam = (ThreadParam *)calloc(1, sizeof(ThreadParam));
     threadParam->ls_db_size = 0;
+    threadParam->routing_size = 0;
     threadParam->router = router;
     int i;
     for(i=0;i < router->num_of_interface;i++){
@@ -117,6 +118,10 @@ int main(int argc, char *argv[]){
             if(strcmp(command, "showlsdb\n") == 0){ // there is a \n in the stdin
                 showLSDB(threadParam);
             }
+            if(strcmp(command, "showrt\n") == 0){ // there is a \n in the stdin
+                showRouting(threadParam);
+            }
+
 
         }
         else{
