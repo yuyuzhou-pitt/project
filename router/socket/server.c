@@ -140,6 +140,10 @@ void *serverthread(void *arg){
                 repackLSA(router, packet_req);
                 addBufferFlood(threadParam, packet_req, ethx); // except the ethx from which it received the LSA.
                 //pthread_mutex_unlock(&lockserver); // Critical section end
+                genGraph(threadParam);
+                genRouting(threadParam);
+                //min_route(int sid, int did, int *gateway, int *metric);
+
             }
             /* Data packet */
             else if(strcmp(packet_req->PacketType, "100") == 0){
@@ -149,7 +153,7 @@ void *serverthread(void *arg){
             }
    
             pthread_mutex_unlock(&lockserver); // Critical section end
-            sleep(1); // sleep some time or other thread do not have chance to get the lock
+            usleep(1); // sleep some time or other thread do not have chance to get the lock
         }
 
     }
