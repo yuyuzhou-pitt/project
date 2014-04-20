@@ -29,11 +29,11 @@ void enqueue(Packet_Q *head, Packet *v){
 }
 
 /*dequeue the first thread node*/
-Packet_Q *dequeue(Packet_Q *head){
+Packet *dequeue(Packet_Q *head){
     Packet_Q *r;
     r = head->next;
     head->next = head->next->next;
-    return r;
+    return r->packet;
 }
 
 /*Buff initialization*/
