@@ -169,6 +169,7 @@ int app_incomingFile(struct message msg)
 		{
 			printf("File Recieved: %s\n", (*recieved).name);
 			free(recieved);
+			recieved = NULL;
 			recieved_data = 0;
 		}
 		free(msg.data);

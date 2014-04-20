@@ -1,8 +1,10 @@
 /*************************************************************************/
 /*	This requres -lsocket -lnsl when linking the object              */ 
 /*************************************************************************/
+#define TRANSFILE 1
 #include "socket.h"
 #define BUFFER_SIZE 1024
+
 
 int socket_printIP()
 {
@@ -136,26 +138,44 @@ getaddr(char *hostname, char *addrstr)
 
 }
 
-char* convertPacketToChar(struct packet pkg)
+Packet convertPacketToChar(struct packet pkg)
 {
+
+	Packet outgoing;
+	//Old Code
+	/*
 	char* buffer = malloc(BUFFER_SIZE);
 	memset(buffer, 0, BUFFER_SIZE);
-	memcpy(buffer,pkg.router_ID, 17);
-	memcpy(buffer + 17, pkg.packet_type, 4);
-	memcpy(buffer + 21, pkg.src_IP, 33);
-	memcpy(buffer + 54, pkg.dest_IP, 33);
-	memcpy(buffer + 87 ,pkg.length, 11);
-	memcpy(buffer + 98, pkg.data, atoi(pkg.length) + 1);
-	memcpy(buffer + 99 + atoi(pkg.length), pkg.packet_life, 5);
-	memcpy(buffer + 104 + atoi(pkg.length), pkg.checksum, 33);
+	memcpy(buffer,pkg.router_ID, 17 + 16);
+	memcpy(buffer + 17+ 16, pkg.packet_type, 4);
+	memcpy(buffer + 21+ 16, pkg.src_IP, 33);
+	memcpy(buffer + 54+ 16, pkg.dest_IP, 33);
+	memcpy(buffer + 87+ 16 ,pkg.length, 11);
+	memcpy(buffer + 98+ 16, pkg.data, atoi(pkg.length) + 1);
+	memcpy(buffer + 99+ 16 + atoi(pkg.length), pkg.packet_life, 5);
+	memcpy(buffer + 104 + 16+ atoi(pkg.length), pkg.checksum, 33);
 
 	printPacketDEBUG("Outgoing Data",buffer);
-	return buffer;
+	*/
+	
+	strncpy(outgoing.RouterID, pkg.router_ID, 32);
+	strncpy(outgoing.PacketType, pkg.packet_type, 4);
+	Trans_Data data;
+	strncpy(data.src_ip, pkg.src_IP, 32);
+	strncpy(data.des_ip, pkg.dest_IP, 32);
+	data.length = atoi(pkg.length);
+	memcpy(data.data, pkg.data, atoi(pkg.length) + 1);
+	
+	outgoing.Data = data;
+	memcpy(outgoing.PacketChecksum, pkg.checksum, 32);
+	return outgoing;
 }
 
-struct packet convertCharToPacket(char* buffer)
+struct packet convertCharToPacket(Packet buffer)
 {
 	struct packet pkg;
+	//OLD CODE
+	/*
 	memcpy(pkg.router_ID, buffer, 17);	
 	memcpy(pkg.packet_type, buffer + 17, 4);
 	memcpy(pkg.src_IP, buffer + 21, 33);
@@ -168,6 +188,19 @@ struct packet convertCharToPacket(char* buffer)
 
 	printPacketDEBUG("Incoming Data",buffer);
 	free(buffer);
+	*/
+	
+	strncpy(pkg.router_ID, buffer.RouterID, 32);
+	strncpy(pkg.packet_type, buffer.PacketType, 4);
+	Trans_Data data;
+	data = buffer.Data;
+	strncpy(pkg.src_IP, data.src_ip, 32);
+	strncpy(pkg.dest_IP, data.des_ip, 32);
+	snprintf(pkg.length, 11, "%010d", data.length);
+	pkg.data = malloc( atoi(pkg.length) + 1);
+	memcpy(pkg.data, data.data, atoi(pkg.length) + 1);
+	memcpy(pkg.checksum, buffer.PacketChecksum, 32);
+
 	return pkg;
 }
 
@@ -213,19 +246,18 @@ void socket_rcvFile()
     while(1)
 	{
     		client_fd = Accept(sockfd, client_sockaddr, sin_size);
-		
-    		char buff[BUFFER_SIZE];
+
     		/* Receive from the remote side */
 		int cont = 1;
 		while(cont == 1)
 		{
-    		memset(buff, 0, sizeof(buff));
-    		Recv(client_fd,buff,sizeof(buff),0);
-		struct packet pkt = convertCharToPacket(buff);
+    		Packet recieved;
+    		Recv(client_fd,&recieved,sizeof(recieved),0);
+		struct packet pkt = convertCharToPacket(recieved);
 		if(lsrp_incomingmessage(pkt) == 0)
 		{
-			memcpy(buff,convertPacketToChar(lsrp_createACK(pkt)),BUFFER_SIZE);
-			Send(client_fd, buff, sizeof(buff),0);
+			Packet ack = convertPacketToChar(lsrp_createACK(pkt));
+			Send(client_fd, &ack, sizeof(ack),0);
     			close(client_fd);
 			cont = 0;
 		}
@@ -237,8 +269,6 @@ void socket_rcvFile()
 void socket_sendFile(char * hostname, int port, struct packet pkg)
 {
     int sockfd,sendbytes,recvbytes;
-    char buff[BUFFER_SIZE];
-    char buff_recieved[BUFFER_SIZE];
     struct hostent *host;
     struct sockaddr_in sockaddr;
 
@@ -261,18 +291,16 @@ void socket_sendFile(char * hostname, int port, struct packet pkg)
     Connect(sockfd,sockaddr,sizeof(sockaddr));
 
     /*send message*/
-    memset(buff, 0, sizeof(buff));
-    memset(buff_recieved, 0, sizeof(buff_recieved));
-    memcpy(buff,convertPacketToChar(pkg),BUFFER_SIZE);
     int pid = 0;
     int cont = 1;
     while(cont == 1)
     {
     if((pid = fork()) == 0)
     { 
-	
-        sendbytes = Send(sockfd,buff,sizeof(buff), 0);
-        Recv(sockfd,buff_recieved,sizeof(buff_recieved), 0); 
+	Packet toSend = convertPacketToChar(pkg);
+        sendbytes = Send(sockfd,&toSend,sizeof(toSend), 0);
+	Packet recv;
+        Recv(sockfd,&recv,sizeof(recv), 0); 
         _exit(0);
     }
     else
@@ -297,6 +325,5 @@ void socket_sendFile(char * hostname, int port, struct packet pkg)
     }
     }
     close(sockfd);
-    free(buff);
     free(pkg.data);
 }

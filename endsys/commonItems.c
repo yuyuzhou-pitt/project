@@ -1,6 +1,6 @@
 #include "commonItems.h"
 int MTU = 1000;
-char edge_IP[17] = {'0','0','0','.','0','0','0','.','0','0','0','.','0','0','0','\0'};
+char edge_IP[33] = {'0','0','0','.','0','0','0','.','0','0','0','.','0','0','0','\0'};
 int edge_Port = 0;
 int timeout = 100;
 int errorRate = 0;
@@ -11,9 +11,10 @@ void commonItems_setMTU(int MTU_temp)
 	MTU = MTU_temp;
 }
 
-void commonItems_setEdgeRouter(int port, char IP[17])
+void commonItems_setEdgeRouter(int port, char IP[33])
 {
 	edge_Port = port;
+	memset(edge_IP, '0',32);
 	memcpy(edge_IP, IP, sizeof(edge_IP));
 }
 
@@ -86,18 +87,18 @@ void printPacketDEBUG(char* outOrIn, char* string)
 	if(DEBUG == 1)
 	{
 		printf("DEBUG: %s\n",outOrIn);
-		printf("ROUTER ID: %.*s\n", 17, string);
-		printf("PACKET TYPE: %.*s\n",4, string + 17);
-		printf("SRC IP: %.*s\n",33, string + 21);
-		printf("DEST IP: %.*s\n",33, string + 54);
-		printf("LENGTH: %.*s\n",11, string + 87);
+		printf("ROUTER ID: %.*s\n", 33, string);
+		printf("PACKET TYPE: %.*s\n",4, string + 33);
+		printf("SRC IP: %.*s\n",33, string + 37);
+		printf("DEST IP: %.*s\n",33, string + 37 + 33);
+		printf("LENGTH: %.*s\n",11, string + 37 + 33 + 33);
 	
 		char * length = malloc(11);
-		memcpy(length, string + 87, 11);
+		memcpy(length, string + 37 + 33 + 33, 11);
 
-		fwrite(string + 98, 1,atoi(length) + 1, stdout);
-		printf("\nPACKET_LIFE: %.*s\n",5, string +  99 + atoi(length));
-		printf("CHECKSUM: %.*s\n",33, string + 104 + atoi(length));
+		fwrite(string + 101, 1,atoi(length) + 1, stdout);
+		printf("\nPACKET_LIFE: %.*s\n",5, string +  37 + 33 + 33 + 11 + 1 + atoi(length));
+		printf("CHECKSUM: %.*s\n",33, string + 37 + 33 + 33 + 11 + 1 + 5 + atoi(length));
 		printf("\n\n\n");
 		free(length);
 	}

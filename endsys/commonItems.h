@@ -35,7 +35,7 @@
 
 	struct packet
 	{
-		char router_ID[17];
+		char router_ID[33];
 		char packet_type[4]; // data packets are 110
 		char src_IP[33];
 		char dest_IP[33];
@@ -58,7 +58,7 @@
 
 	extern int MTU;
 	extern int edge_Port;
-	extern char edge_IP[17];
+	extern char edge_IP[33];
 	extern int timeout;
 	extern int errorRate;
 	extern int DEBUG;
