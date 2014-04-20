@@ -150,6 +150,7 @@ void *serverthread(void *arg){
                 // data, addBuff();
                 //Thans_Data trans_data = (Trans_Data)packet->Data;
                 //getEthx(router, trans_data.des_ip); // calculate the out interface according to the routing table
+                addBufferData(threadParam, packet_req);
             }
    
             pthread_mutex_unlock(&lockserver); // Critical section end

@@ -331,7 +331,7 @@ int genRouting(ThreadParam *threadParam){
                 //printf("src=%d, dest=%d, gateway=%d, metric=%d\n", threadParam->port, threadParam->graph_line[i].lineId, gateway, metric);
 
                 rRouterid = portToHost(routerid, threadParam, threadParam->graph_line[i].lineId);
-                rGatewayid = portToHost(gatewayid, threadParam, threadParam->graph_line[i].lineId);
+                rGatewayid = portToHost(gatewayid, threadParam, gateway);
                 rInterface = portToInterface(interface, threadParam, threadParam->port, threadParam->graph_line[i].lineId);
                 rNetmask = portToNetmask(netmask, threadParam, threadParam->port, threadParam->graph_line[i].lineId);
 
@@ -355,10 +355,10 @@ int genRouting(ThreadParam *threadParam){
 int showRouting(ThreadParam *threadParam){
     int i;
     fprintf(stdout, "\nshowRouting: routing_size: %d\n", threadParam->routing_size);
-    fprintf(stdout, "Destination\tGenmask    \tGateway    \tMetric(us)\tIface\n");
+    fprintf(stdout, "Destination\tGateway    \tMetric(us)\tIface\n");
     for(i=0;i< threadParam->routing_size;i++){
-        fprintf(stdout, "%s\t%s\t%s\t%d\t%s\n", threadParam->routing[i].Destination, \
-                threadParam->routing[i].GenMask, threadParam->routing[i].Gateway, \
+        fprintf(stdout, "%s\t%s\t%d\t%s\n", threadParam->routing[i].Destination, \
+                threadParam->routing[i].Gateway, \
                 threadParam->routing[i].Metric, threadParam->routing[i].Interface);
     }
 }

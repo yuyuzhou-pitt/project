@@ -109,6 +109,9 @@ Router *getRouter(char *filename){
         if(strcmp(strstrip(tmp_param), "direct_link_addr") == 0){
             snprintf(router->ethx[interface].direct_link_addr, sizeof(router->ethx[interface].direct_link_addr), "%s", strstrip(tmp_value));
         }
+        if(strcmp(strstrip(tmp_param), "direct_link_type") == 0){
+            router->ethx[interface].direct_link_type = atoi(strstrip(tmp_value));
+        }
         if(strcmp(strstrip(tmp_param), "link_availability") == 0){
             router->ethx[interface].link_availability = atoi(strstrip(tmp_value));
         }
@@ -178,6 +181,7 @@ num_of_interface = %d\n\
 eth_id = %s # identifies the link, set it UNIQUE \n\
 netmask = %s # netmask of the link \n\
 direct_link_addr = %s # remote host ip (router_id)\n\
+direct_link_type = %d # 0 is router, 1 is end system, default is 0\n\
 link_availability = %d # default is avail\n\
 link_cost_method = %s # auto - calculated by  ping delay, manual - manual setting\n\
 link_cost = %d # infinit\n\
@@ -185,10 +189,10 @@ link_failure_time = %d # seconds\n\
 packet_error_rate = %d\n\
 \n\
 ", i, router->ethx[i].eth_id, router->ethx[i].netmask, router->ethx[i].direct_link_addr, \
-       router->ethx[i].link_availability, router->ethx[i].link_cost_method, \
+       router->ethx[i].direct_link_type, router->ethx[i].link_availability, router->ethx[i].link_cost_method, \
        router->ethx[i].link_cost, router->ethx[i].link_failure_time, router->ethx[i].packet_error_rate);
 
-       strcat(routerStr, ethxStr); // add ethx information to router
+       strncat(routerStr, ethxStr, strlen(ethxStr)); // add ethx information to router
     }
 
     fwrite(strstrip(routerStr), 1 , strlen(strstrip(routerStr)) , fp );
@@ -337,6 +341,7 @@ int showHelp(){
     printf("  help      show these messages\n");
     printf("  quit      stop this router and quit\n");
     printf("  showlsdb  show link state database\n");
+    printf("  showrt  show routing table\n");
 
     return 0;
 }
