@@ -102,8 +102,10 @@ int main(int argc, char *argv[]){
     int rc;
     char command[64], arguments[64];
     int terminal = 1;
+    showHelp();
     while(terminal == 1){
-        fprintf(stdout, "\nEnter the commands ('help' for usage): \n");
+        fprintf(stdout, "(lsrp-router)# ");
+        //fprintf(stdout, "\nEnter the commands ('help' for usage): \n(lsrp-router)# ");
 	fflush(stdin);
 	if (fgets(command, sizeof(command), stdin) != NULL ){
             if(strcmp(command, "quit\n") == 0){ // there is a \n in the stdin

@@ -35,15 +35,15 @@ Router *getRouter(char *filename){
     ssize_t read;
 
     if(access(filename, F_OK) < 0) {
-        char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "getRouter: File not found: %s\n", filename);
-        logging(LOGFILE, logmsg);
-        return;
+        fprintf(stderr, "ERROR: getRouter: File not found: %s\n", filename);
+        exit(-1);
+        //return;
     }
 
     if ((fp = fopen(filename,"rt"))<0){
-        char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "getRouter: Faile to open file: %s \n", filename);
-        logging(LOGFILE, logmsg);
-        return;
+        fprintf(stderr, "ERROR: getRouter: Faile to open file: %s \n", filename);
+        exit(-1);
+        //return;
     }
 
     Router *router;
@@ -338,10 +338,10 @@ int showHelp(){
     printf("\nUsage: <subcommand> [options]\n");
     printf("A user interface that can be used to properly configure the router parameters.\n\n");
     printf("Subcommands:\n");
-    printf("  help      show these messages\n");
+    printf("  help      show this message\n");
     printf("  quit      stop this router and quit\n");
     printf("  showlsdb  show link state database\n");
-    printf("  showrt  show routing table\n");
+    printf("  showrt    show routing table\n\n");
 
     return 0;
 }
