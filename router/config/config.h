@@ -12,6 +12,7 @@ typedef struct Router_Ethernet{
     char eth_id[32];// = 10.0.0.1
     char netmask[32];
     char direct_link_addr[32]; // = 10.0.0.2
+    char direct_link_eth_id[32]; // = 10.0.0.2
     int direct_link_type; //0 is router, 1 is end system, default is 0
     int direct_link_port;
     int link_availability; //

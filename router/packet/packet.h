@@ -7,6 +7,7 @@ typedef struct LS_Link_Status{
     char Link_ID[32]; // use eth_id in cfg, Identifies the ID of the Link
     char netmask[32]; 
     char Direct_Link_Addr[32];
+    char Direct_Link_EthID[32];
     int PortID;
     int Availability; // the status of availability
     struct timeval Link_Cost;// the status of the cost in micro seconds
@@ -40,6 +41,7 @@ typedef struct Ping_Message{
     int ping_pong_bit; // 0 that means ping which needs a response, else 1 means pong and no response is needed.
     struct timeval timer; // the time stamp when send out 
     char src_ip[32]; //??
+    char src_eth_id[32]; // the interface to be update into remote LSA packet
     char des_ip[32]; //??
     int packet_life; // in seconds
 }Ping_Msg;
