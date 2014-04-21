@@ -186,11 +186,11 @@ void *sockclient(void *arg){
     
         /* generate neighbors_req according to configure file */
         neighbor_req = genNeighborReq(router, atoi(portstr)); // msg to be sent out
-        send(clientfd, neighbor_req, sizeof(Packet), 0);
+        send(clientfd, neighbor_req, sizeof(Packet), MSG_NOSIGNAL);
     
         neighbor_reply = (Packet *)malloc(sizeof(Packet));
         /* Receive neighbors_reply from remote side */
-        Recv(clientfd, neighbor_reply, sizeof(Packet), 0);
+        Recv(clientfd, neighbor_reply, sizeof(Packet), MSG_NOSIGNAL);
     
         if(strcmp(neighbor_reply->Data.NeighborAcqType, "001") == 0){
             //pthread_t hellothreadid;
@@ -244,7 +244,7 @@ void *sockclient(void *arg){
         
                         //printf("ping_interval=%d\n", ping_interval);
                         //pthread_mutex_lock(&lock_send); // Critical section to read port files
-                        sendPing(clientfd, router, timer);
+                        sendPing(clientfd, router, timer, ethx);
                         //pthread_mutex_unlock(&lock_send); // Critical section end
     
                         snprintf(logmsg, sizeof(logmsg), "sockclient(0x%x): Ping packet sent.\n", pthread_self());
@@ -316,7 +316,7 @@ void *sockclient(void *arg){
                     }
                     /* LSA packet */
                     else if(strcmp(threadParam->buffer[ethx].packet_q->next->packet->PacketType, "010") == 0){
-                        //printf("sockclient: threadParam->buffer[ethx].buffsize=%d\n", threadParam->buffer[ethx].buffsize);
+                        //printf("sockclient(0x%x): send original LSA %s packet to %s\n", pthread_self(), threadParam->buffer[ethx].packet_q->next->packet->RouterID, remote_server);
                         sendBufferLSA(clientfd, &threadParam->buffer[ethx]);
                     }
                     /* Data packet */
@@ -330,7 +330,7 @@ void *sockclient(void *arg){
      
                 /* Receive packet_req from server */
                 //packet_reply = (Packet *)malloc(sizeof(Packet));
-                //Recv(clientfd, packet_reply, sizeof(Packet), 0);
+                //Recv(clientfd, packet_reply, sizeof(Packet), MSG_NOSIGNAL);
     
                 /* do nothing after receive packet from server ?? */
             } //endof while(1)

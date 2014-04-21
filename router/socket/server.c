@@ -59,12 +59,12 @@ void *serverthread(void *arg){
     
     /* Receive neighbors_req from remote side */
     neighbor_req = (Packet *)malloc(sizeof(Packet));
-    Recv(sockfd, neighbor_req, sizeof(Packet), 0);
+    Recv(sockfd, neighbor_req, sizeof(Packet), MSG_NOSIGNAL);
 
     /* generate neighbors_reply reply according to configure file */
     neighbor_reply = genNeighborReq(router, threadParam->port); // msg to be sent back
     genNeighborReply(router, neighbor_req, neighbor_reply); // update the Neighbor Acquisition Type
-    Send(sockfd, neighbor_reply, sizeof(Packet), 0);
+    Send(sockfd, neighbor_reply, sizeof(Packet), MSG_NOSIGNAL);
 
 
     /* if neighbor request confirmed:
@@ -104,7 +104,7 @@ void *serverthread(void *arg){
             Packet *packet_req, *packet_reply; // MUST use pointer to fit different Packet
             packet_req = (Packet *)calloc(1, sizeof(Packet));
 
-            Recv(sockfd, packet_req, sizeof(Packet), 0);
+            Recv(sockfd, packet_req, sizeof(Packet), MSG_NOSIGNAL);
         
             //printf("serverthread(0x%x): got packet from %s with PacketType = %s \n", pthread_self(), packet_req->RouterID, packet_req->PacketType);
 
@@ -121,13 +121,16 @@ void *serverthread(void *arg){
             /* Ping packet */
             else if(strcmp(packet_req->PacketType, "011") == 0 ){
                 /* calculate link cost */
+                char remote_eth_id[32];
+                memset(remote_eth_id, 0, sizeof(remote_eth_id));
                 //printf("serverthread: got ping packet from %s\n", packet_req->RouterID);
-                tmpcost = calCost(packet_req, router->ping_alpha, &cost, timer);
+                tmpcost = calCost(packet_req, router->ping_alpha, &cost, timer, remote_eth_id);
                 //cost.tv_sec = tmpcost->tv_sec;
                 //cost.tv_usec = tmpcost->tv_usec;
 
                 //printf("serverthread(0x%x): cost is: %d:%d\n", cost.tv_sec, cost.tv_usec);
                 router->ethx[ethx].link_cost = cost; // update router for LSA packet
+                strncpy(router->ethx[ethx].direct_link_eth_id, remote_eth_id, strlen(remote_eth_id)); // update router for LSA packet
             }
             /* LSA packet */
             else if(strcmp(packet_req->PacketType, "010") == 0){
@@ -137,7 +140,7 @@ void *serverthread(void *arg){
                 installLSA(threadParam, packet_req); // installs the new LSA in its link state database.
                 //genLSAACK(threadParam, packet_req);
                 //addBufferACK(threadParam, packet_req, ethx); // ready to send LSA ack
-                repackLSA(router, packet_req);
+                //repackLSA(router, packet_req);
                 addBufferFlood(threadParam, packet_req, ethx); // except the ethx from which it received the LSA.
                 //pthread_mutex_unlock(&lockserver); // Critical section end
                 genGraph(threadParam);
