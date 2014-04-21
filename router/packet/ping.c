@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <netinet/in.h>
 #include "../../endsys/checksum.h"
 #include "../config/config.h"
 #include "../config/liblog.h"
@@ -8,7 +9,7 @@
 #define PING 1
 #include "packet.h"
 
-Packet *genPingMsg(Router *router, int ping_pong_bit, struct timeval timer){
+Packet *genPingMsg(Router *router, int ping_pong_bit, struct timeval timer, int ethx){
     /*generate ping message*/
 
     Ping_Msg ping_msg;
@@ -16,6 +17,7 @@ Packet *genPingMsg(Router *router, int ping_pong_bit, struct timeval timer){
     ping_msg.ping_pong_bit = ping_pong_bit;
     ping_msg.timer = timer;
     ping_msg.packet_life = router->ping_timeout; // >= the maximum cost
+    snprintf(ping_msg.src_eth_id, sizeof(ping_msg.src_eth_id), "%s", router->ethx[ethx].eth_id);
 
     /*wrap into packet*/
     Packet *ping_packet;
@@ -32,24 +34,22 @@ Packet *genPingMsg(Router *router, int ping_pong_bit, struct timeval timer){
     return ping_packet;
 }
 
-int sendPing(int sockfd, Router *router, struct timeval timer){
+int sendPing(int sockfd, Router *router, struct timeval timer, int ethx){
     Packet *ping_packet;
-    ping_packet = genPingMsg(router, '0', timer); // msg to be sent out, 0 means request 
-    Send(sockfd, ping_packet, sizeof(Packet), 0);
+    ping_packet = genPingMsg(router, '0', timer, ethx); // msg to be sent out, 0 means request 
     //printf("sendPing: ping_packet->PacketType = %s\n", ping_packet->PacketType);
 
-    return 0;
+    return Send(sockfd, ping_packet, sizeof(Packet), MSG_NOSIGNAL);
 }
 
-int sendPong(int sockfd, Router *router, struct timeval timer){
+int sendPong(int sockfd, Router *router, struct timeval timer, int ethx){
     Packet *pong_packet;
-    pong_packet = genPingMsg(router, '1', timer); // 1 means pong
-    Send(sockfd, pong_packet, sizeof(Packet), 0);
-
-    return 0;
+    pong_packet = genPingMsg(router, '1', timer, ethx); // 1 means pong
+    return Send(sockfd, pong_packet, sizeof(Packet), MSG_NOSIGNAL);
 }
 
-struct timeval *calCost(Packet *packet_req, int alpha, struct timeval *cost, struct timeval timer){
+struct timeval *calCost(Packet *packet_req, int alpha, struct timeval *cost, struct timeval timer, char *remote_eth_id){
+    strncpy(remote_eth_id, packet_req->Data.src_eth_id, strlen(packet_req->Data.src_eth_id));
     struct timeval current_cost, *new_cost;
 
     //printf("calCost: my timer is: %d:%d\n", timer.tv_sec, timer.tv_usec);

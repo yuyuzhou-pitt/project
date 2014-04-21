@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <netinet/in.h>
 #include "../config/config.h"
 #include "../config/liblog.h"
 #include "../../endsys/checksum.h"
@@ -56,5 +57,5 @@ int sendNeighborReply(int sockfd, Packet *packet_req, Router *router, int port){
    Packet *packet_reply;
    packet_reply = genNeighborReq(router, port); // msg to be sent back
    genNeighborReply(router, packet_req, packet_reply); // update the Neighbor Acquisition Type
-   Send(sockfd, packet_reply, sizeof(Packet), 0);
+   return Send(sockfd, packet_reply, sizeof(Packet), MSG_NOSIGNAL);
 }

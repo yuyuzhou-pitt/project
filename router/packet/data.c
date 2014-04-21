@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <netinet/in.h>
 #include "../../endsys/checksum.h"
 #include "../config/config.h"
 #include "../config/libfile.h"
@@ -14,7 +15,7 @@ int sendBufferData(int sockfd, Packet_Buff *buffer){
     Packet *packet;
     if(buffer->buffsize > 0){
         packet = (Packet *)dequeue(buffer->packet_q);
-        Send(sockfd, packet, sizeof(Packet), 0);
+        Send(sockfd, packet, sizeof(Packet), MSG_NOSIGNAL);
         buffer->buffsize--;
     }
     else{

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <netinet/in.h>
 #include "../../endsys/checksum.h"
 #include "../config/config.h"
 #include "../config/liblog.h"
@@ -34,8 +35,6 @@ int sendHello(int sockfd, Router *router, int port){
     /* generate hellos_reply reply according to configure file */
     Packet *hello_packet;
     hello_packet = genHelloReq(router, port); // msg to be sent back
-    Send(sockfd, hello_packet, sizeof(Packet), 0);
     //printf("sendHello: hello_packet->PacketType = %s\n", hello_packet->PacketType);
-
-    return 0;
+    return Send(sockfd, hello_packet, sizeof(Packet), MSG_NOSIGNAL);
 }

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <netinet/in.h>
 #include "../../endsys/checksum.h"
 #include "../config/config.h"
 #include "../config/libfile.h"
@@ -35,6 +36,7 @@ Packet *genLSAMsg(ThreadParam *threadParam, int ls_sequence_number, struct timev
         snprintf(lsa_msg.ls_link[i].Link_ID, sizeof(lsa_msg.ls_link[i].Link_ID), "%s", router->ethx[i].eth_id);
         snprintf(lsa_msg.ls_link[i].netmask, sizeof(lsa_msg.ls_link[i].netmask), "%s", router->ethx[i].netmask);
         snprintf(lsa_msg.ls_link[i].Direct_Link_Addr, sizeof(lsa_msg.ls_link[i].Direct_Link_Addr), "%s", router->ethx[i].direct_link_addr);
+        snprintf(lsa_msg.ls_link[i].Direct_Link_EthID, sizeof(lsa_msg.ls_link[i].Direct_Link_EthID), "%s", router->ethx[i].direct_link_eth_id);
         lsa_msg.ls_link[i].PortID = router->ethx[i].direct_link_port;
         lsa_msg.ls_link[i].Availability = router->ethx[i].link_availability; //default as 1, set it as 0 if timeout or disabled
         lsa_msg.ls_link[i].Link_Cost = router->ethx[i].link_cost; //router->ethx[i].link_cost;
@@ -53,6 +55,7 @@ Packet *genLSAMsg(ThreadParam *threadParam, int ls_sequence_number, struct timev
 
     return lsa_packet;
 }
+
 
 int installLSA(ThreadParam *threadParam, Packet *packet_req){
     Packet *packet;
@@ -74,6 +77,7 @@ int installLSA(ThreadParam *threadParam, Packet *packet_req){
                 int i;
                 for(i=0;i < packet->Data.Number_of_Links;i++){
                     if(strcmp(threadParam->ls_db[dbIndex].src_router_id, packet->Data.ls_link[i].Direct_Link_Addr) == 0){
+                        snprintf(threadParam->ls_db[dbIndex].Link_ID, sizeof(threadParam->ls_db[dbIndex].Link_ID), "%s", packet->Data.ls_link[i].Direct_Link_EthID);
                         threadParam->ls_db[dbIndex].des_port_id = packet->Data.Advertising_Port_ID;
                         threadParam->ls_db[dbIndex].src_port_id = packet->Data.ls_link[i].PortID;
                         threadParam->ls_db[dbIndex].Availability = packet->Data.ls_link[i].Availability;
@@ -96,7 +100,7 @@ int installLSA(ThreadParam *threadParam, Packet *packet_req){
             if(packet->Data.Advertising_Port_ID != 0 && packet->Data.ls_link[i].PortID != 0){
                 //printf("installLSA: Advertising_Router_ID - PortID: %s - %s\n", packet->Data.Advertising_Router_ID, packet->Data.ls_link[i].PortID);
                 dbIndex = threadParam->ls_db_size;
-                snprintf(threadParam->ls_db[dbIndex].Link_ID, sizeof(threadParam->ls_db[dbIndex].Link_ID), "%s", packet->Data.ls_link[i].Link_ID);
+                snprintf(threadParam->ls_db[dbIndex].Link_ID, sizeof(threadParam->ls_db[dbIndex].Link_ID), "%s", packet->Data.ls_link[i].Direct_Link_EthID);
                 snprintf(threadParam->ls_db[dbIndex].netmask, sizeof(threadParam->ls_db[dbIndex].netmask), "%s", packet->Data.ls_link[i].netmask);
                 snprintf(threadParam->ls_db[dbIndex].src_router_id, sizeof(threadParam->ls_db[dbIndex].src_router_id), "%s", packet->Data.ls_link[i].Direct_Link_Addr);
                 threadParam->ls_db[dbIndex].des_port_id = packet->Data.Advertising_Port_ID;
@@ -130,9 +134,8 @@ int sendNewLSA(int sockfd, ThreadParam *threadParam, int ls_sequence_number, str
     /* add into LS DB before send out */
     installLSA(threadParam, lsa_packet);
     //printf("sendNewLSA: send LSA packet %s with type %s\n", lsa_packet->RouterID, lsa_packet->PacketType);
-    Send(sockfd, lsa_packet, sizeof(Packet), 0);
     //printf("sendLSA: lsa_packet->PacketType = %s\n", lsa_packet->PacketType);
-    return 0;
+    return Send(sockfd, lsa_packet, sizeof(Packet), MSG_NOSIGNAL);
 }
 
 /* replace the router_id */
@@ -141,11 +144,12 @@ int repackLSA(Router *router, Packet *packet){
 }
 
 int sendBufferLSA(int sockfd, Packet_Buff *buffer){
+    int r;
     Packet *lsa_packet;
     if(buffer->buffsize > 0){
         lsa_packet = (Packet *)dequeue(buffer->packet_q);
         //printf("sendBufferLSA: packet sent: %s\n", lsa_packet->Data.Advertising_Router_ID);
-        Send(sockfd, lsa_packet, sizeof(Packet), 0);
+        r = Send(sockfd, lsa_packet, sizeof(Packet), MSG_NOSIGNAL);
         buffer->buffsize--;
     }
     else{
@@ -154,7 +158,7 @@ int sendBufferLSA(int sockfd, Packet_Buff *buffer){
         logging(LOGFILE, logmsg);
         return -1;
     }
-    return 0;
+    return r;
 }
 
 /* add LSA to flood buffer, except the ethx from which it received the LSA. */
@@ -332,7 +336,7 @@ int genRouting(ThreadParam *threadParam){
 
                 rRouterid = portToHost(routerid, threadParam, threadParam->graph_line[i].lineId);
                 rGatewayid = portToHost(gatewayid, threadParam, gateway);
-                rInterface = portToInterface(interface, threadParam, threadParam->port, threadParam->graph_line[i].lineId);
+                rInterface = portToInterface(interface, threadParam, threadParam->port, gateway);
                 rNetmask = portToNetmask(netmask, threadParam, threadParam->port, threadParam->graph_line[i].lineId);
 
                 /* skip if no ls_db exists */
