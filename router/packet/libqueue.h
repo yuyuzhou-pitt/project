@@ -1,6 +1,7 @@
 #ifndef __SEMAPHORE_H__
 #define __SEMAPHORE_H__
 
+#include <pthread.h>
 #include "packet.h"
 #include "../config/config.h"
 #define ETHX 128
@@ -28,6 +29,11 @@ typedef struct Thread_Parameters{
     Graph_Line graph_line[ETHX];
     int routing_size;
     Routing_Table routing[ETHX]; // recording local routing table
+    pthread_mutex_t lock;
+    pthread_mutex_t lock_send;
+    pthread_mutex_t lock_endsys;
+    pthread_mutex_t lock_buffer;
+    pthread_mutex_t lock_server;
 }ThreadParam;
 
 Packet_Q *initlist();
