@@ -30,16 +30,6 @@
 #define LOGFILE "lsrp-router.log"
 //#define LSRPCFG "config/lsrp-router.cfg"
 
-int vread(char *fmt, ...){
-    int rc;
-    va_list arg_ptr;
-    va_start(arg_ptr, fmt);
-    rc = vscanf(fmt, arg_ptr);
-    va_end(arg_ptr);
-
-    return(rc);
-}
-
 /* three parts in the main:
  * 1) a terminal for router configuration
  * 2) a thread for sockserver
@@ -57,11 +47,11 @@ int main(int argc, char *argv[]){
         exit(1);
     }
     else if(argc == 2) {
-        fprintf(stdout, "lsrp-router: use router cfg file: %s\n", argv[1]);
+        fprintf(stdout, "(lsrp-router): use router cfg file: %s\n", argv[1]);
         router = getRouter(argv[1]);
     }
     else {
-        fprintf(stdout, "lsrp-router: use default router cfg file: %s\n", lsrpcfg);
+        fprintf(stdout, "(lsrp-router): use default router cfg file: %s\n", lsrpcfg);
         router = getRouter(lsrpcfg);
     }
 
@@ -84,8 +74,8 @@ int main(int argc, char *argv[]){
 
     /* for server thread */
     pthread_t sockserverid; 
-    fprintf(stdout, "lsrp-router: please track log file for detail: %s\n", LOGFILE);
     pthread_create(&sockserverid, NULL, &sockserver, (void *)threadParam);
+    fprintf(stdout, "(lsrp-router): socket server start up.\n");
 
     /* for client threads*/
     pthread_t threadid[NTHREADS]; // Thread pool
@@ -96,8 +86,10 @@ int main(int argc, char *argv[]){
     /* start num_of_interface threads in busy wait */
     for(iThread=0; iThread < router->num_of_interface; iThread++){
         pthread_create(&threadid[iThread], &attr, &sockclient, (void *)threadParam);
+        fprintf(stdout, "(lsrp-router): socket client %d start up.\n", iThread);
         //sleep(1);
     }
+    fprintf(stdout, "(lsrp-router): please track log file for detail: %s\n", LOGFILE);
     
     int rc;
     char command[64], arguments[64];
