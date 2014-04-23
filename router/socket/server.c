@@ -12,6 +12,7 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <netinet/in.h>
 #include <pthread.h>
@@ -24,21 +25,17 @@
 
 #define PORT 0 //0 means assign a port randomly
 #define BUFFER_SIZE  1024
-#define MAX_QUE_CONN_NM 5
-#define TIMER 1000  //Timeout value in seconds
+#define MAX_QUE_CONN_NM 1024
+#define TIMER 3600  //Timeout value in seconds
 #define CONTINUE 1 
 #define NTHREADS 5
-//#define LSRPCFG "config/lsrp-router.cfg"
 
 pthread_t threadid[NTHREADS]; // Thread pool
-pthread_mutex_t lockserver = PTHREAD_MUTEX_INITIALIZER;
 int counter = 0;
 
-//char *lsrpcfg = "lsrp-router.cfg";
 char hostname[1024]; // local hostname and domain
 char addrstr[100]; // local ip address (eth0)
 int port; // local socket port
-
 
 /*thread for new client connection, arg is the client_fd*/
 void *serverthread(void *arg){
@@ -50,6 +47,9 @@ void *serverthread(void *arg){
     Router *router;
     router = threadParam->router;
 
+    int isEndsys = -1;
+    int isNeighbor = -1;
+    char logmsg[128]; 
     /* There are 5 types of Neighbor Acquisition Packets.
      * Neighbor Acquisition Type:
      * neighbor_req: Be_Neighbors_Request(000) or Cease_Neighbors_Request(100)
@@ -61,34 +61,62 @@ void *serverthread(void *arg){
     neighbor_req = (Packet *)malloc(sizeof(Packet));
     Recv(sockfd, neighbor_req, sizeof(Packet), MSG_NOSIGNAL);
 
-    /* generate neighbors_reply reply according to configure file */
-    neighbor_reply = genNeighborReq(router, threadParam->port); // msg to be sent back
-    genNeighborReply(router, neighbor_req, neighbor_reply); // update the Neighbor Acquisition Type
-    Send(sockfd, neighbor_reply, sizeof(Packet), MSG_NOSIGNAL);
+    /* Neighbor request packet */
+    if(strcmp(neighbor_req->PacketType, "000") == 0){
 
+        /* generate neighbors_reply reply according to configure file */
+        neighbor_reply = genNeighborReq(router, threadParam->port); // msg to be sent back
+        genNeighborReply(router, neighbor_req, neighbor_reply); // update the Neighbor Acquisition Type
+        Send(sockfd, neighbor_reply, sizeof(Packet), MSG_NOSIGNAL);
+    
+    
+        /* if neighbor request confirmed:
+         * 1) exchange alive (hello) message in HelloInterval seconds
+         * 2) exchange LSA message in UpdateInterval seconds, or every time there is updates
+         *     */
+    
+        snprintf(logmsg, sizeof(logmsg), "serverthread(0x%x): reply neighbor acq type: %s\n", \
+                                          pthread_self(), neighbor_reply->Data.NeighborAcqType);
+        logging(LOGFILE, logmsg);
+        /* Be_Neighbors_Confirm: 001 */
+        if(strcmp(neighbor_reply->Data.NeighborAcqType, "001") == 0){
+            isNeighbor = 1;
+        }
+    }
+    /* Endsystem, data packet */
+    else if(strcmp(neighbor_req->PacketType, "100") == 0){
+        snprintf(logmsg, sizeof(logmsg), "serverthread(0x%x): got data from endsystem %s, enqueue...\n", 
+                                          pthread_self(), neighbor_req->RouterID);
+        logging(LOGFILE, logmsg);
+        int endsysEthx = getEthx(router, neighbor_req->RouterID);
+        repackData(router, neighbor_req);
+        pthread_mutex_lock(&threadParam->lock_buffer);
+        addBufferData(threadParam, neighbor_req);
+        pthread_mutex_unlock(&threadParam->lock_buffer);
 
-    /* if neighbor request confirmed:
-     * 1) exchange alive (hello) message in HelloInterval seconds
-     * 2) exchange LSA message in UpdateInterval seconds, or every time there is updates
-     *     */
+        /* wait for ACK (110) */
+        int sendACK = 0;
+        while(sendACK == 0){
+            if(threadParam->buffer[endsysEthx].buffsize > 0){
+                pthread_mutex_lock(&threadParam->lock_buffer);
+                if(strcmp(threadParam->buffer[endsysEthx].packet_q->next->packet->PacketType, "110") == 0 ){
+                    sendBufferData(sockfd, &threadParam->buffer[endsysEthx]);
+                    sendACK = 1;
+                }
+                pthread_mutex_unlock(&threadParam->lock_buffer);
+            }
+        }
 
-    char logmsg[128]; 
-    snprintf(logmsg, sizeof(logmsg), "serverthread(0x%x): reply neighbor acq type: %s\n", \
-                                      pthread_self(), neighbor_reply->Data.NeighborAcqType);
-    logging(LOGFILE, logmsg);
+        /* each packet comes from end system will start a new socket,
+         * close this client and quit this thread according to the endsys logic,
+         * or the next packet will never come */
+        snprintf(logmsg, sizeof(logmsg), "serverthread(0x%x): served one packet from end system, exiting thread\n", pthread_self());
+        logging(LOGFILE, logmsg);
 
-    if(strcmp(neighbor_reply->Data.NeighborAcqType, "001") == 0){
+    }
 
-        /* internal buffer, do not exchange to other routers */
-        //Packet_Buff *neighbor_buff, *hello_buff, *lsa_buff, *ping_buff;
-        
-        /* use a thread to keep alive */
-        //pthread_t hellothreadid;
-        //pthread_create(&hellothreadid, NULL, &helloserver, (void *) sockfd);
-
-        /* use another thread for LSA */
-        //pthread_t LSAthreadid;
-        //pthread_create(&LSAthreadid, NULL, &LSAserver, (void *) sockfd);
+    /* continue if communicate with neighbor */
+    if(isNeighbor == 1){
 
         struct timeval *tmpcost, cost, timer; // use high quality timer to calculate the ping cost
         struct timezone tzp;
@@ -97,7 +125,7 @@ void *serverthread(void *arg){
         while(1){
 
             /* Receive packet_req from client */
-            pthread_mutex_lock(&lockserver);
+            pthread_mutex_lock(&threadParam->lock_server);
 
             gettimeofday(&timer, &tzp);
 
@@ -106,6 +134,7 @@ void *serverthread(void *arg){
 
             Recv(sockfd, packet_req, sizeof(Packet), MSG_NOSIGNAL);
         
+            //printf("serverthread(0x%x): packet_req type: %s\n", pthread_self(), packet_req->PacketType);
             //printf("serverthread(0x%x): got packet from %s with PacketType = %s \n", pthread_self(), packet_req->RouterID, packet_req->PacketType);
 
             int ethx = getEthx(router, packet_req->RouterID);
@@ -136,40 +165,32 @@ void *serverthread(void *arg){
             else if(strcmp(packet_req->PacketType, "010") == 0){
                 /* use LSA to fill the LS Database */
                 //printf("serverthread: got LSA packet from %s\n", packet_req->RouterID);
-                //pthread_mutex_lock(&lockserver);
+                //pthread_mutex_lock(&lock_server);
                 installLSA(threadParam, packet_req); // installs the new LSA in its link state database.
                 //genLSAACK(threadParam, packet_req);
                 //addBufferACK(threadParam, packet_req, ethx); // ready to send LSA ack
-                //repackLSA(router, packet_req);
-                addBufferFlood(threadParam, packet_req, ethx); // except the ethx from which it received the LSA.
-                //pthread_mutex_unlock(&lockserver); // Critical section end
+                repackLSA(router, packet_req);
+                addBufferFlood(threadParam, packet_req, ethx, timer); // except the ethx from which it received the LSA.
+                //pthread_mutex_unlock(&lock_server); // Critical section end
                 genGraph(threadParam);
                 genRouting(threadParam);
                 //min_route(int sid, int did, int *gateway, int *metric);
 
             }
-            /* Data packet */
-            else if(strcmp(packet_req->PacketType, "100") == 0){
-                // data, addBuff();
-                //Thans_Data trans_data = (Trans_Data)packet->Data;
-                //getEthx(router, trans_data.des_ip); // calculate the out interface according to the routing table
+            /* Data (100) or ACK (110) packet */
+            else if(strcmp(packet_req->PacketType, "100") == 0 || strcmp(packet_req->PacketType, "110") == 0){
+                //printf("serverthread(0x%x): got data from %s, enqueue...\n", pthread_self(), packet_req->RouterID);
+                repackData(router, packet_req);
                 addBufferData(threadParam, packet_req);
             }
    
-            pthread_mutex_unlock(&lockserver); // Critical section end
+            pthread_mutex_unlock(&threadParam->lock_server); // Critical section end
             usleep(1); // sleep some time or other thread do not have chance to get the lock
         }
 
     }
 
-    //sleep(3600);
-
-    /* Critical section */
-    pthread_mutex_lock(&lockserver);
-    counter++;
-    pthread_mutex_unlock(&lockserver);
-  
-    close(sockfd);
+    shutdown(sockfd, SHUT_RDWR);
     snprintf(logmsg, sizeof(logmsg), "serverthread(0x%x): served request, exiting thread\n", pthread_self());
     logging(LOGFILE, logmsg);
 
@@ -185,6 +206,7 @@ void *sockserver(void *arg){
     struct sockaddr_in server_sockaddr, client_sockaddr;
     int sin_size, recvbytes, sendbytes;
     int sockfd, client_fd, desc_ready;
+    char logmsg[128];
 
     sin_size=sizeof(client_sockaddr);
 
@@ -194,7 +216,7 @@ void *sockserver(void *arg){
     
     /* Data structure for the select I/O */
     fd_set ready_set, test_set;
-    int maxfd, nready, nbytes;
+    int maxfd, nready, client[FD_SETSIZE];
 
     /* create socket */
     sockfd = Socket(AF_INET,SOCK_STREAM,0);
@@ -202,7 +224,7 @@ void *sockserver(void *arg){
     /* set parameters for sockaddr_in */
     server_sockaddr.sin_family = AF_INET;
     server_sockaddr.sin_port = htons(PORT); //0, assign port automatically in 1024 ~ 65535
-    server_sockaddr.sin_addr.s_addr = INADDR_ANY; //0, got local IP automatically
+    server_sockaddr.sin_addr.s_addr = htonl(INADDR_ANY); //0, got local IP automatically
     bzero(&(server_sockaddr.sin_zero), 8);
    
     int i = 1;//enable reuse the combination of local address and socket
@@ -214,6 +236,8 @@ void *sockserver(void *arg){
     threadParam->port = port;
     writePort(port, addrstr);
     
+    snprintf(logmsg, sizeof(logmsg), "sockserver: Server %s (%s) is setup on port: %d\n", addrstr, hostname, port);
+    logging(LOGFILE, logmsg);
     Listen(sockfd, MAX_QUE_CONN_NM);
    
     /* Thread attribute */
@@ -225,6 +249,10 @@ void *sockserver(void *arg){
 
     /* Set up the I/O for the socket, nonblocking */
     maxfd = sockfd;
+    int k;
+    for(k=0;k<FD_SETSIZE;k++){
+        client[k] = -1;
+    }
     FD_ZERO(&ready_set);
     FD_ZERO(&test_set);
     FD_SET(sockfd, &test_set);
@@ -239,7 +267,6 @@ void *sockserver(void *arg){
 
     int status;
     status=CONTINUE;
-    char logmsg[128];
     while (status==CONTINUE){
         if (iThread == NTHREADS){
             iThread = 0;
@@ -247,23 +274,45 @@ void *sockserver(void *arg){
 
         memcpy(&ready_set, &test_set, sizeof(test_set));
         nready = select(maxfd+1, &ready_set, NULL, NULL, tvptr);
+
         switch(nready){
             case -1:
-                perror("\nSELECT: unexpected error occured.\n" );
-                exit(-1);
-                status=-1;
-                break;
+                printf("sockserver: errno: %d.\n", errno);
+                perror("\nSELECT: unexpected error occured.\n");
+                logging(LOGFILE, "\nSELECT: unexpected error occured.\n");
+
+                /* remove bad fd */
+                for(k=0;k<FD_SETSIZE;k++){
+                    if(client[k] > 0){
+                        struct stat tStat;
+                        if (-1 == fstat(client[k], &tStat)){
+                            printf("fstat %d error:%s", sockfd, strerror(errno));
+                            FD_CLR(client[k], &ready_set);
+                        }
+                    }
+                }
+                //exit(-1); // do not exit when error happened
+                //status=-1;
+                //break;
             case 0:
                 /* timeout occuired */
-                logging(LOGFILE, "\nTIMEOUT...\n");
-                status=-1;
-                break;
+                //printf("sockserver: TIMEOUT... %d.\n", errno);
+                logging(LOGFILE, "\nsockserver: TIMEOUT...\n");
+                //status=-1;
+                //break;
             default:
                 if (FD_ISSET(sockfd, &ready_set)){
                     snprintf(logmsg, sizeof(logmsg), "sockserver(0x%x): Listening socket is readable\n", pthread_self());
                     logging(LOGFILE, logmsg);
                     /* wait for connection */
                     client_fd = Accept(sockfd, client_sockaddr, sin_size);
+                    for(k=0;k<FD_SETSIZE;k++){
+                        if(client[k] < 0){
+                            client[k] = client_fd;
+                        }
+                    }
+
+                    //printf("sockserver: using client_fd: %d\n", client_fd);
                     FD_SET(client_fd, &test_set);
                     if (client_fd > maxfd) maxfd = client_fd;
                     snprintf(logmsg, sizeof(logmsg), "sockserver(0x%x): Descriptor %d is readable\n",  pthread_self(), client_fd);
