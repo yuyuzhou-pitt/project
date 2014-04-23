@@ -23,18 +23,13 @@
 
 #define PORT   0 //4321
 #define BUFFER_SIZE 1024
-//#define LSRPCFG "config/lsrp-router.cfg"
-#define READ_PORT_INTERVAL 10 // busy wait interval to read port files
-//#define ENDSYS_PORTFILE "../endsys/"
+#define READ_PORT_INTERVAL 20 // busy wait interval to read port files
 
 char hostname[1024]; // local hostname and domain
 char addrstr[100]; // local ip address (eth0)
 
-pthread_mutex_t lock, lock_send, lock_endsys, lock_buffer;
-
 /* thread for lsrp-client */
 void *sockclient(void *arg){
-//int main(void){
     ThreadParam *threadParam;
     threadParam = (ThreadParam *) arg;
 
@@ -56,7 +51,7 @@ void *sockclient(void *arg){
     while(1){
         int iEthx;
         memset(portstr, 0, sizeof(portstr)); 
-        pthread_mutex_lock(&lock); // Critical section to read port files
+        pthread_mutex_lock(&threadParam->lock); // Critical section to read port files
         /* Steps:
          * 1) go through all the direct_link_addr in cfg file
          * 2) if port file do NOT exists, busy wait
@@ -81,7 +76,8 @@ void *sockclient(void *arg){
                 if(strlen(templine) > 5){
                     char tempsplit[128];
                     strcpy(tempsplit, templine);
-                    char *split1, *split2, *strsplit = &tempsplit;
+                    char *split1, *split2, *strsplit;
+                    strsplit = tempsplit;
                     int inList = 0;
                     while(strlen(strsplit) > 0){
                         split1 = strtok_r(strsplit, ":", &split2);
@@ -100,9 +96,6 @@ void *sockclient(void *arg){
                         snprintf(portstr, sizeof(portstr), "%s", tempport);
                         portFound = 1;
                     }
-                    //snprintf(logmsg, sizeof(logmsg), "sockclient(0x%x): %s:%s is occupied, try next one.\n", \
-                    //                                  pthread_self(), router->ethx[iEthx].direct_link_addr, tempport);
-                    //logging(LOGFILE, logmsg);
                 }
                 /* 4) if port file exists and NOT occupied, use it */
                 else if(strlen(templine) == 5){
@@ -147,7 +140,7 @@ void *sockclient(void *arg){
                 }
             }
         }
-        pthread_mutex_unlock(&lock); // Critical section end
+        pthread_mutex_unlock(&threadParam->lock); // Critical section end
     
         sleep(READ_PORT_INTERVAL);
 
@@ -165,16 +158,51 @@ void *sockclient(void *arg){
     if(endsysEthx != -1 ){
         while(1){
             /* read data from buffer */
-            printf("i'm handling data from endsys..\n");
-            pthread_mutex_lock(&lock_buffer);
+            pthread_mutex_lock(&threadParam->lock_buffer);
             if(threadParam->buffer[endsysEthx].buffsize > 0){
-                sendBufferData(clientfd, &threadParam->buffer[endsysEthx]);
+                //printf("sockclient(0x%x): threadParam->buffer[%d].buffsize: %d, type of the first item: %s\n", 
+                //    pthread_self(), endsysEthx, threadParam->buffer[endsysEthx].buffsize,
+                //    threadParam->buffer[endsysEthx].packet_q->next->packet->PacketType);
 
+                /* out going buffer devided by interface, maybe there are other type of packet exists */
+                /* do not handle ACK (110), let server side to deal with it */
+                if(strcmp(threadParam->buffer[endsysEthx].packet_q->next->packet->PacketType, "100") == 0){
+                    snprintf(logmsg, sizeof(logmsg), "sockclient(0x%x): forward File with type %s from %s to endsystem %s through ethx %d\n",
+                        pthread_self(), threadParam->buffer[endsysEthx].packet_q->next->packet->PacketType,
+                        threadParam->buffer[endsysEthx].packet_q->next->packet->RouterID, remote_server, endsysEthx);
+                    logging(LOGFILE, logmsg);
+
+                    sendBufferData(clientfd, &threadParam->buffer[endsysEthx]);
+
+                    Packet *packet_ack;
+                    packet_ack= (Packet *)malloc(sizeof(Packet));
+
+                    /* got ack from endsys for each of the packet */
+                    Recv(clientfd, packet_ack, sizeof(Packet), MSG_NOSIGNAL);
+
+                    /* only add data ack (110) to buffer */
+                    if(strcmp(packet_ack->PacketType, "110") == 0){
+                        // data, addBuff();
+                        //Thans_Data trans_data = (Trans_Data)packet->Data;
+                        //getEthx(router, trans_data.des_ip); // calculate the out interface according to the routing table
+                        snprintf(logmsg, sizeof(logmsg), "serverthread(0x%x): got ack data from %s, enqueue...\n", 
+                                 pthread_self(), packet_ack->RouterID);
+                        logging(LOGFILE, logmsg);
+                        repackData(router, packet_ack);
+                        addBufferData(threadParam, packet_ack);
+                    }
+                    else{
+                        snprintf(logmsg, sizeof(logmsg), "sockclient(0x%x): data is not ack.\n", pthread_self());
+                        logging(LOGFILE, logmsg);
+                    }
+                    
+                }
             }
-            pthread_mutex_unlock(&lock_buffer);
+            pthread_mutex_unlock(&threadParam->lock_buffer);
             usleep(1); //sleep some time for lock relase
         }
     }
+    /* other routers */
     else{
 
         /* there are 5 types of Neighbor Acquisition Packets.
@@ -193,8 +221,6 @@ void *sockclient(void *arg){
         Recv(clientfd, neighbor_reply, sizeof(Packet), MSG_NOSIGNAL);
     
         if(strcmp(neighbor_reply->Data.NeighborAcqType, "001") == 0){
-            //pthread_t hellothreadid;
-            //pthread_create(&hellothreadid, NULL, &helloclient, (void *) clientfd);
     
             int hello_interval = router->hello_interval;
             int ping_interval = router->ping_interval;
@@ -210,78 +236,19 @@ void *sockclient(void *arg){
             int ethx = getEthx(router, remote_server);
             Packet *packet_req, *packet_reply; // MUST use pointer to fit different Packet
     
-            //int clientfd = router->clientfd;
             while(1){
     
                 gettimeofday(&timer, &tzp);
                 time_t now = timer.tv_sec;
     
-                pthread_mutex_lock(&lock_send); // Critical section to read port files
-                /* hello message */
-                if(now % hello_interval ==0){
-                    if(hello_sent == 0){
-                        now1 = now;
-                        hello_sent = 1;
-        
-                        //printf("hello_interval=%d\n", hello_interval);
-    
-                        //pthread_mutex_lock(&lock_send); // Critical section to read port files
-                        sendHello(clientfd, router, atoi(portstr));
-                        //pthread_mutex_unlock(&lock_send); // Critical section end
-    
-                        snprintf(logmsg, sizeof(logmsg), "sockclient(0x%x): Hello packet sent.\n", pthread_self());
-                        logging(LOGFILE, logmsg);
-                    }
-                    if(now != now1){
-                        hello_sent = 0;
-                    }
-                }
-                /* ping message */
-                if(now % ping_interval ==0){
-                    if(ping_sent == 0){
-                        now1 = now;
-                        ping_sent = 1;
-        
-                        //printf("ping_interval=%d\n", ping_interval);
-                        //pthread_mutex_lock(&lock_send); // Critical section to read port files
-                        sendPing(clientfd, router, timer, ethx);
-                        //pthread_mutex_unlock(&lock_send); // Critical section end
-    
-                        snprintf(logmsg, sizeof(logmsg), "sockclient(0x%x): Ping packet sent.\n", pthread_self());
-                        logging(LOGFILE, logmsg);
-                    }
-                    if(now != now1){
-                        ping_sent = 0;
-                    }
-                }
-                /* lsa message */
-                if(now % ls_updated_interval ==0){
-                    if(lsa_sent == 0){
-                        now2 = now;
-                        lsa_sent = 1;
-                        ls_sequence_number++;
-    
-                        /* TODO: check acknowledgment, keep sending if no ack */
-                        //pthread_mutex_lock(&lock_send); // Critical section to read port files
-                        //printf("sockclient(0x%x): send LSA packet from %s to %s\n", pthread_self(), addrstr, remote_server);
-                        sendNewLSA(clientfd, threadParam, ls_sequence_number, timer);
-                        //pthread_mutex_unlock(&lock_send); // Critical section end
-    
-                        //sendNewLSA(clientfd, router, ls_sequence_number, timer, atoi(portstr), remote_server);
-                        //printf("ls_updated_interval=%d\n", ls_updated_interval);
-                        snprintf(logmsg, sizeof(logmsg), "sockclient(0x%x): LSA packet sent.\n", pthread_self());
-                        logging(LOGFILE, logmsg);
-                    }
-                    if(now != now2){
-                        lsa_sent = 0;
-                    }
-                }
-                pthread_mutex_unlock(&lock_send); // Critical section end
-    
                 /* read data from buffer */
-                pthread_mutex_lock(&lock_buffer);
+                pthread_mutex_lock(&threadParam->lock_buffer);
                 //printf("sockclient(0x%x): threadParam->buffer[%d].buffsize: %d\n", pthread_self(), ethx, threadParam->buffer[ethx].buffsize);
                 if(threadParam->buffer[ethx].buffsize > 0){
+                    snprintf(logmsg, sizeof(logmsg), "sockclient(0x%x): threadParam->buffer[%d].buffsize: %d, first item type %s\n", 
+                            pthread_self(), ethx, threadParam->buffer[ethx].buffsize, 
+                            threadParam->buffer[ethx].packet_q->next->packet->PacketType);
+                    logging(LOGFILE, logmsg);
                     /* p *threadParam
                     $14 = {sockfd = 8, port = 46976, router = 0x608250, ls_db_size = 1, ls_db = {{Link_ID = "a", '\000' <repeats 30 times>, 
                     des_router_id = '\000' <repeats 31 times>, des_port_id = 12589, src_router_id = "10.0.0.1", '\000' <repeats 17 times>, 
@@ -316,31 +283,88 @@ void *sockclient(void *arg){
                     }
                     /* LSA packet */
                     else if(strcmp(threadParam->buffer[ethx].packet_q->next->packet->PacketType, "010") == 0){
-                        //printf("sockclient(0x%x): send original LSA %s packet to %s\n", pthread_self(), threadParam->buffer[ethx].packet_q->next->packet->RouterID, remote_server);
+                        snprintf(logmsg, sizeof(logmsg), "sockclient(0x%x): forward LSA %s packet to %s\n", 
+                                pthread_self(), threadParam->buffer[ethx].packet_q->next->packet->RouterID, remote_server);
+                        logging(LOGFILE, logmsg);
                         sendBufferLSA(clientfd, &threadParam->buffer[ethx]);
                     }
-                    /* Data packet */
-                    else if(strcmp(threadParam->buffer[ethx].packet_q->next->packet->PacketType, "100") == 0){
+                    /* Data or ACK packet */
+                    else if(strcmp(threadParam->buffer[ethx].packet_q->next->packet->PacketType, "100") == 0 ||
+                            strcmp(threadParam->buffer[ethx].packet_q->next->packet->PacketType, "110") == 0){
+                        snprintf(logmsg, sizeof(logmsg), "sockclient(0x%x): forward Data %s packet to %s\n", 
+                                pthread_self(), threadParam->buffer[ethx].packet_q->next->packet->RouterID, remote_server);
+                        logging(LOGFILE, logmsg);
                         sendBufferData(clientfd, &threadParam->buffer[ethx]);
                     }
     
                 }
-                pthread_mutex_unlock(&lock_buffer);
+                pthread_mutex_unlock(&threadParam->lock_buffer);
+
+
+                /* sending other packet */
+                pthread_mutex_lock(&threadParam->lock_send); // Critical section to read port files
+                /* hello message */
+                if(now % hello_interval ==0){
+                    if(hello_sent == 0){
+                        now1 = now;
+                        hello_sent = 1;
+        
+                        //pthread_mutex_lock(&lock_send); // Critical section to read port files
+                        sendHello(clientfd, router, atoi(portstr));
+                        //pthread_mutex_unlock(&lock_send); // Critical section end
+    
+                        snprintf(logmsg, sizeof(logmsg), "sockclient(0x%x): Hello packet sent.\n", pthread_self());
+                        logging(LOGFILE, logmsg);
+                    }
+                    if(now != now1){
+                        hello_sent = 0;
+                    }
+                }
+                /* ping message */
+                if(now % ping_interval ==0){
+                    if(ping_sent == 0){
+                        now1 = now;
+                        ping_sent = 1;
+        
+                        //pthread_mutex_lock(&lock_send); // Critical section to read port files
+                        sendPing(clientfd, router, timer, ethx);
+                        //pthread_mutex_unlock(&lock_send); // Critical section end
+    
+                        snprintf(logmsg, sizeof(logmsg), "sockclient(0x%x): Ping packet sent.\n", pthread_self());
+                        logging(LOGFILE, logmsg);
+                    }
+                    if(now != now1){
+                        ping_sent = 0;
+                    }
+                }
+                /* lsa message */
+                if(now % ls_updated_interval ==0){
+                    if(lsa_sent == 0){
+                        now2 = now;
+                        lsa_sent = 1;
+                        ls_sequence_number++;
+    
+                        /* TODO: check acknowledgment, keep sending if no ack */
+                        //pthread_mutex_lock(&lock_send); // Critical section to read port files
+                        //printf("sockclient(0x%x): send LSA packet from %s to %s\n", pthread_self(), addrstr, remote_server);
+                        sendNewLSA(clientfd, threadParam, ls_sequence_number, timer);
+                        //pthread_mutex_unlock(&lock_send); // Critical section end
+                        snprintf(logmsg, sizeof(logmsg), "sockclient(0x%x): LSA packet sent.\n", pthread_self());
+                        logging(LOGFILE, logmsg);
+                    }
+                    if(now != now2){
+                        lsa_sent = 0;
+                    }
+                }
+                pthread_mutex_unlock(&threadParam->lock_send); // Critical section end
+    
                 usleep(1); //sleep some time for lock relase
      
-                /* Receive packet_req from server */
-                //packet_reply = (Packet *)malloc(sizeof(Packet));
-                //Recv(clientfd, packet_reply, sizeof(Packet), MSG_NOSIGNAL);
-    
-                /* do nothing after receive packet from server ?? */
             } //endof while(1)
     
         } // endof if(strcmp(neighbor_reply
     } // endof if endsysEthx
-    //pthread_mutex_lock(&lock_endsys);
 
-    //sleep(3600);
     close(clientfd);
     pthread_exit(0);
-    //exit(0);
 }
