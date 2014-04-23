@@ -62,7 +62,7 @@ struct timeval *calCost(Packet *packet_req, int alpha, struct timeval *cost, str
     /* update routing table */
 
     if(current_cost.tv_sec < 0) current_cost.tv_sec = 0;
-    if(current_cost.tv_usec < 0) current_cost.tv_usec = 0;
+    if(current_cost.tv_usec < 0) current_cost.tv_usec = 1; //make it no-zeor or can not genarate routing table
 
     cost->tv_sec = alpha * cost->tv_sec + (1 -  alpha) * current_cost.tv_sec;
     cost->tv_usec = alpha * cost->tv_usec + (1 -  alpha) * current_cost.tv_usec;
