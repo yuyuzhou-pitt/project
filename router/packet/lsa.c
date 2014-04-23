@@ -36,7 +36,13 @@ Packet *genLSAMsg(ThreadParam *threadParam, int ls_sequence_number, struct timev
         snprintf(lsa_msg.ls_link[i].Link_ID, sizeof(lsa_msg.ls_link[i].Link_ID), "%s", router->ethx[i].eth_id);
         snprintf(lsa_msg.ls_link[i].netmask, sizeof(lsa_msg.ls_link[i].netmask), "%s", router->ethx[i].netmask);
         snprintf(lsa_msg.ls_link[i].Direct_Link_Addr, sizeof(lsa_msg.ls_link[i].Direct_Link_Addr), "%s", router->ethx[i].direct_link_addr);
-        snprintf(lsa_msg.ls_link[i].Direct_Link_EthID, sizeof(lsa_msg.ls_link[i].Direct_Link_EthID), "%s", router->ethx[i].direct_link_eth_id);
+        /* check endsystem or not */
+        if(router->ethx[i].direct_link_type == 1){
+            snprintf(lsa_msg.ls_link[i].Direct_Link_EthID, sizeof(lsa_msg.ls_link[i].Direct_Link_EthID), "end-system-ethx ");
+        }
+        else{
+            snprintf(lsa_msg.ls_link[i].Direct_Link_EthID, sizeof(lsa_msg.ls_link[i].Direct_Link_EthID), "%s", router->ethx[i].direct_link_eth_id);
+        }
         lsa_msg.ls_link[i].PortID = router->ethx[i].direct_link_port;
         lsa_msg.ls_link[i].Availability = router->ethx[i].link_availability; //default as 1, set it as 0 if timeout or disabled
         lsa_msg.ls_link[i].Link_Cost = router->ethx[i].link_cost; //router->ethx[i].link_cost;
@@ -62,20 +68,21 @@ int installLSA(ThreadParam *threadParam, Packet *packet_req){
     packet = (Packet *)packet_req;
 
     /* check whether the same LSA with new sequence number */
-    int sameLSA = 0;
+    int existedLSA = 0;
 
     int dbIndex;
     //printf("installLSA: got LSA packet from: %s\n", packet->Data.Advertising_Router_ID);
     for(dbIndex=0;dbIndex < threadParam->ls_db_size; dbIndex++){
         /* whether Advertising_Router_ID is the des_router_id */
         if(strcmp(threadParam->ls_db[dbIndex].des_router_id, packet->Data.Advertising_Router_ID) == 0){
-            sameLSA = 1;
+            existedLSA = 1;
             /* do update if got bigger seq number */
             //printf("installLSA: this packet from %s in db already\n", packet->Data.Advertising_Router_ID);
             if(threadParam->ls_db[dbIndex].LS_Sequence_Number < packet->Data.LS_Sequence_Number){
                 //printf("installLSA: do update as got bigger seq number %d from: %s\n", packet->Data.LS_Sequence_Number, packet->Data.Advertising_Router_ID);
                 int i;
                 for(i=0;i < packet->Data.Number_of_Links;i++){
+                    /* update if interface exists */
                     if(strcmp(threadParam->ls_db[dbIndex].src_router_id, packet->Data.ls_link[i].Direct_Link_Addr) == 0){
                         snprintf(threadParam->ls_db[dbIndex].Link_ID, sizeof(threadParam->ls_db[dbIndex].Link_ID), "%s", packet->Data.ls_link[i].Direct_Link_EthID);
                         threadParam->ls_db[dbIndex].des_port_id = packet->Data.Advertising_Port_ID;
@@ -91,13 +98,13 @@ int installLSA(ThreadParam *threadParam, Packet *packet_req){
         }
     }
 
-    if(sameLSA == 0){
+    if(existedLSA == 0){
         //printf("installLSA: install new LSA packet from %s\n", packet->Data.Advertising_Router_ID);
         /* add all new LS into db */
         int i;
         for(i=0;i < packet->Data.Number_of_Links;i++){
-            /* skip if port is 0 */
-            if(packet->Data.Advertising_Port_ID != 0 && packet->Data.ls_link[i].PortID != 0){
+            /* skip if port is 0 (let genGraph do that) */ 
+            //if(packet->Data.Advertising_Port_ID != 0 && packet->Data.ls_link[i].PortID != 0){
                 //printf("installLSA: Advertising_Router_ID - PortID: %s - %s\n", packet->Data.Advertising_Router_ID, packet->Data.ls_link[i].PortID);
                 dbIndex = threadParam->ls_db_size;
                 snprintf(threadParam->ls_db[dbIndex].Link_ID, sizeof(threadParam->ls_db[dbIndex].Link_ID), "%s", packet->Data.ls_link[i].Direct_Link_EthID);
@@ -112,13 +119,13 @@ int installLSA(ThreadParam *threadParam, Packet *packet_req){
                 threadParam->ls_db[dbIndex].LS_Age = packet->Data.LS_Age;
         
                 threadParam->ls_db_size++;
-            }
+            /*}
             else{
                 char logmsg[128];
                 snprintf(logmsg, sizeof(logmsg), "installLSA: either src_port (%d) or des_port (%d) is empty, skip.\n", \
                          packet->Data.ls_link[i].PortID, packet->Data.Advertising_Port_ID);
                 logging(LOGFILE, logmsg);
-            }
+            }*/
         }
     }
 
@@ -146,14 +153,16 @@ int repackLSA(Router *router, Packet *packet){
 int sendBufferLSA(int sockfd, Packet_Buff *buffer){
     int r;
     Packet *lsa_packet;
+    char logmsg[128]; 
     if(buffer->buffsize > 0){
         lsa_packet = (Packet *)dequeue(buffer->packet_q);
         //printf("sendBufferLSA: packet sent: %s\n", lsa_packet->Data.Advertising_Router_ID);
         r = Send(sockfd, lsa_packet, sizeof(Packet), MSG_NOSIGNAL);
         buffer->buffsize--;
+        snprintf(logmsg, sizeof(logmsg), "sendBufferLSA:buffer->buffsize = %d\n",buffer->buffsize);
+        logging(LOGFILE, logmsg);
     }
     else{
-        char logmsg[128]; 
         snprintf(logmsg, sizeof(logmsg), "sendBufferLSA: Buffer is empty.");
         logging(LOGFILE, logmsg);
         return -1;
@@ -162,23 +171,39 @@ int sendBufferLSA(int sockfd, Packet_Buff *buffer){
 }
 
 /* add LSA to flood buffer, except the ethx from which it received the LSA. */
-int addBufferFlood(ThreadParam *threadParam, Packet *packet, int ethx){
+int addBufferFlood(ThreadParam *threadParam, Packet *packet, int ethx, struct timeval timer){
     int i;
     int isDirect = 0;
+    char logmsg[128]; 
     /* TODO: prevent loop */
     //printf("addBufferflood:threadParam->router->num_of_interface = %d\n",threadParam->router->num_of_interface);
+    /* do nothing if the time past certain rounds */
+    if (timer.tv_sec - packet->Data.LS_Age > threadParam->router->ls_age_limit){
+        snprintf(logmsg, sizeof(logmsg), "addBufferFlood: LS_Age_limit reached, drop packet original from %s.", packet->Data.Advertising_Router_ID);
+        logging(LOGFILE, logmsg);
+        return -1;
+    }
+
     for (i=0;i < threadParam->router->num_of_interface; i++){
-        /* prevent loop before enqueue: do nothing if original Advertising_Router_ID is the target */
-        //if(strcmp(threadParam->router->ethx[i].direct_link_addr, packet->Data.Advertising_Router_ID) == 0){
-        if(strcmp(threadParam->router->ethx[i].direct_link_addr, packet->Data.Advertising_Router_ID) != 0){
-        //for (i=0;i < threadParam->router->num_of_interface; i++){
+        /* prevent loop before enqueue: 
+         * 1) do nothing if original Advertising_Router_ID is the target */
+        /* 2) do nothing if original Advertising_Router_ID is me */
+        /* 3) do nothing if the interface connectes to end system (direct_link_type is 1) */
+        /* 4) do not send back to the RouterID comes from */
+        //if(strcmp(threadParam->router->ethx[i].direct_link_addr, packet->Data.Advertising_Router_ID) != 0){
+        if(strcmp(threadParam->router->ethx[i].direct_link_addr, packet->Data.Advertising_Router_ID) != 0 && \
+           strcmp(threadParam->router->router_id, packet->Data.Advertising_Router_ID) != 0 && \
+           strcmp(threadParam->router->ethx[i].direct_link_addr, packet->RouterID) != 0 && \
+           threadParam->router->ethx[i].direct_link_type != 1) {
+
+            /* do not use same link to send back */
             if(i != ethx){
                 enqueue(threadParam->buffer[i].packet_q, packet);
                 //printf("addBufferflood:threadParam->buffer[i].packet_q->next->packet->RouterID = %s\n",threadParam->buffer[i].packet_q->next->packet->RouterID);
                 threadParam->buffer[i].buffsize++;
-                //printf("addBufferflood:threadParam->buffer[i].buffsize = %d\n",threadParam->buffer[i].buffsize);
+                snprintf(logmsg, sizeof(logmsg), "addBufferflood:threadParam->buffer[%d].buffsize = %d\n",i, threadParam->buffer[i].buffsize);
+                logging(LOGFILE, logmsg);
             }
-        //}
 
         }
     }
@@ -216,32 +241,43 @@ int genGraph(ThreadParam *threadParam){
     memset(line, 0, 128*sizeof(Graph_Line));
     int i,j,iLine,iSize = 0;
     for(i=0;i < threadParam->ls_db_size;i++){
-        int isExist = 0;
-        char templine[16];
-        memset(templine, 0, sizeof(templine));
-        iLine = iSize; // add new line by default
-
-        /* node exists or not */
-        for(j=0;j<iSize;j++){
-            if(line[j].lineId == threadParam->ls_db[i].src_port_id){
-                isExist = 1;
-                iLine = j;
-                /* update line */
+        /* skip if port is 0 */
+        if(threadParam->ls_db[i].src_port_id != 0 && threadParam->ls_db[i].des_port_id != 0 &&
+           strcmp(threadParam->ls_db[i].Link_ID, "end-system-ethx ") != 0){
+            int isExist = 0;
+            char templine[16];
+            memset(templine, 0, sizeof(templine));
+            iLine = iSize; // add new line by default
+    
+            /* node exists or not */
+            for(j=0;j<iSize;j++){
+                if(line[j].lineId == threadParam->ls_db[i].src_port_id){
+                    isExist = 1;
+                    iLine = j;
+                    /* update line */
+                }
             }
+    
+            if(isExist == 0){
+                /*add new line*/
+                line[iLine].lineId = threadParam->ls_db[i].src_port_id;
+                snprintf(line[iLine].lineStr, sizeof(line[iLine].lineStr), "%d", line[iLine].lineId);
+                iSize++;
+            }
+    
+            snprintf(templine, sizeof(templine), ":%d-%d", threadParam->ls_db[i].des_port_id, \
+               threadParam->ls_db[i].Link_Cost.tv_sec * 1000000 + threadParam->ls_db[i].Link_Cost.tv_usec);
+            // add <des_node>-<cost>
+            strncat(line[iLine].lineStr, templine, strlen(templine));
+            //printf("genGraph:line[%d].lineStr: %s\n", iLine, line[iLine].lineStr);
+        }
+        else{
+            char logmsg[128];
+            snprintf(logmsg, sizeof(logmsg), "genGraph: either src_port (%d) or des_port (%d) is empty, or it's a end-system-ethx. Skip.\n", \
+                     threadParam->ls_db[i].src_port_id != 0, threadParam->ls_db[i].des_port_id);
+            logging(LOGFILE, logmsg);
         }
 
-        if(isExist == 0){
-            /*add new line*/
-            line[iLine].lineId = threadParam->ls_db[i].src_port_id;
-            snprintf(line[iLine].lineStr, sizeof(line[iLine].lineStr), "%d", line[iLine].lineId);
-            iSize++;
-        }
-
-        snprintf(templine, sizeof(templine), ":%d-%d", threadParam->ls_db[i].des_port_id, \
-           threadParam->ls_db[i].Link_Cost.tv_sec * 1000000 + threadParam->ls_db[i].Link_Cost.tv_usec);
-        // add <des_node>-<cost>
-        strncat(line[iLine].lineStr, templine, strlen(templine));
-        //printf("genGraph:line[%d].lineStr: %s\n", iLine, line[iLine].lineStr);
     }// end for(i=0;
 
     threadParam->graph_line_size = iSize;
@@ -329,6 +365,7 @@ int genRouting(ThreadParam *threadParam){
     //int k = threadParam->routing_size;
     int i, r;
     for(i=0;i < threadParam->graph_line_size;i++){
+        /* except self */
         if(threadParam->port != threadParam->graph_line[i].lineId){
             /* skip if no route */
             if(r = min_route(threadParam->port, threadParam->graph_line[i].lineId, &gateway, &metric, nlist) >= 0){
