@@ -1,0 +1,9 @@
+# Makefile for endSystem
+# cc -c *.c
+CC = gcc
+
+all:endSystem
+
+endSystem:
+	${CC} -c *.c
+	${CC} *.o -lsocket -lnsl -o endSystem
