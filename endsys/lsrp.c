@@ -15,17 +15,17 @@ void packet_causeError(struct packet* pkt)
 struct packet lsrp_createACK(struct packet recv)
 {
 	struct packet pck;
-	memset(pck.router_ID,'0',32);
-	memset(pck.packet_type,'0',3);
-	memset(pck.dest_IP,'0',32);
-	memset(pck.src_IP,'0',32);
+	memset(pck.router_ID,0,32);
+	memset(pck.packet_type,0,3);
+	memset(pck.dest_IP,0,32);
+	memset(pck.src_IP,0,32);
 	memset(pck.packet_life,'1',4);
-	memset(pck.length,'0',10);
+	memset(pck.length,0,10);
 
-	memcpy(pck.src_IP, recv.dest_IP, 33);
-	memcpy(pck.dest_IP, recv.src_IP, 33);
-	memcpy(pck.router_ID + 33 - strlen(edge_IP) - 1, edge_IP, strlen(edge_IP) + 1);
-	memcpy(pck.packet_type, "110\0", 4);
+	strncpy(pck.src_IP, recv.dest_IP, strlen(recv.dest_IP));
+	strncpy(pck.dest_IP, recv.src_IP, strlen(recv.src_IP));
+	strncpy(pck.router_ID, recv.router_ID, strlen(recv.router_ID));
+	memcpy(pck.packet_type, "110\0", 4); // use different type for ACK
 	memcpy(pck.packet_life + 4 , "\0", 1);
 	
 	struct data_segment ds = sw_getACK();
@@ -45,18 +45,19 @@ struct packet lsrp_createACK(struct packet recv)
 struct packet packet_encapsulation(struct data_segment ds, int size,  char * IP)
 {
 	struct packet pck;
-	memset(pck.router_ID,'0',32);
-	memset(pck.packet_type,'0',3);
-	memset(pck.dest_IP,'0',32);
-	memset(pck.src_IP,'0',32);
+	memset(pck.router_ID,0,32);
+	memset(pck.packet_type,0,3);
+	memset(pck.dest_IP,0,32);
+	memset(pck.src_IP,0,32);
 	memset(pck.packet_life,'1',4);
-	memset(pck.length,'0',10);
+	memset(pck.length,0,10);
 
-	char * src_ip = socket_getIP();
-	memcpy(pck.src_IP + 33 - strlen(src_ip) - 1, src_ip, strlen(src_ip) + 1);
-	memcpy(pck.dest_IP + 33 - strlen(IP) - 1, IP, strlen(IP) + 1);
-	memcpy(pck.router_ID + 33 - strlen(edge_IP) - 1, edge_IP, strlen(edge_IP) + 1);
-	memcpy(pck.packet_type, "110\0", 4);
+	char src_ip[32];
+	socket_getIP(src_ip);
+	strncpy(pck.src_IP, src_ip, strlen(src_ip));
+	strncpy(pck.dest_IP, IP, strlen(IP));
+	strncpy(pck.router_ID, src_ip, strlen(src_ip)); // to tell the remote where this packet comes from
+	memcpy(pck.packet_type, "100\0", 4);
 	memcpy(pck.packet_life + 4 , "\0", 1);
 	
 	pck.data = malloc(size + 23);
