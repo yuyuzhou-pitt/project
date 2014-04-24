@@ -21,7 +21,7 @@
 
 	void socket_rcvFile();
 	int socket_printIP();
-	char* socket_getIP();
+	int socket_getIP(char *addrstr);
 	void socket_sendFile(char * hostname, int port, struct packet pkg);
 
 #endif

@@ -50,11 +50,10 @@ int socket_printIP()
     }
 }
 
-char* socket_getIP()
+int socket_getIP(char *addrstr)
 {
   struct addrinfo hints, *res;
   int errcode;
-  char addrstr[100];
   void *ptr;
 
   char hostname[1024];
@@ -71,7 +70,7 @@ char* socket_getIP()
   if (errcode != 0)
     {
       perror ("getaddrinfo");
-      return "\0";
+      return -1;
     }
 
   while (res)
@@ -90,8 +89,7 @@ char* socket_getIP()
       inet_ntop (res->ai_family, ptr, addrstr, 100);
       res = res->ai_next;
     }
-strcat(addrstr,"\0");
-return addrstr;
+return 0;
 }
 
 int
@@ -252,7 +250,7 @@ void socket_rcvFile()
     else
         printf("ERROR: Writing port to file\n");
 
-    Listen(sockfd, 5);
+    Listen(sockfd, 1024);
     printf("STARTUP: Server is setup on port %d\n", port);
     if(fork() == 0)
 	{
@@ -271,8 +269,8 @@ void socket_rcvFile()
 		{
 			Packet ack = convertPacketToChar(lsrp_createACK(pkt));
 			Send(client_fd, &ack, sizeof(ack),0);
-    			close(client_fd);
-			cont = 0;
+    			//close(client_fd); // do not close client socket 
+			//cont = 0;
 		}
 		}
 	}
