@@ -13,6 +13,9 @@ cc *.o -o endSystem  -lsocket -lnsl
 
 This compiles the files into .o files then combines them into an application named endSystem
 
+This can be done through the readme by running
+
+make -f Makefile
 
 ------------------------------------------------------------------------
 Running:
