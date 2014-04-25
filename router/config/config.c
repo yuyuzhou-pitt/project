@@ -372,14 +372,12 @@ int quitRouter(){
 
 int disableLink(Router *router, int ethx){
     router->ethx[ethx].link_availability = 0;
-    fprintf(stdout, "eth%d disabled. NOTE: link will be unavailable on both local or remote side\n");
-    fprintf(stdout, "please run 'showcfg' and 'showlsdb' to show the detail\n\n", ethx);
+    fprintf(stdout, "eth%d disabled. please run 'showcfg' and 'showlsdb' to show the detail\n\n", ethx);
 }
 
 int enableLink(Router *router, int ethx){
     router->ethx[ethx].link_availability = 1;
-    fprintf(stdout, "eth%d enabled. NOTE: link will be availible on both local and remote side\n");
-    fprintf(stdout, "please run 'showcfg' and 'showlsdb' to show the detail\n\n", ethx);
+    fprintf(stdout, "eth%d enabled. please run 'showcfg' and 'showlsdb' to show the detail\n\n", ethx);
 }
 
 int showCFG(Router *router){
