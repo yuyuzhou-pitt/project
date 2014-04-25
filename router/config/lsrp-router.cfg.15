@@ -16,7 +16,7 @@ num_of_interface = 2
 
 [interface config]
 [eth0]
-eth_id = 136.142.227.15.1
+eth_id = 136.142.227.15.0
 netmask = 255.255.255.128
 direct_link_addr = 136.142.227.13 # remote host ip (router_id)
 direct_link_type = 0 # 0 is router, 1 is end system, default is 0
@@ -27,7 +27,7 @@ link_failure_time = 60 # seconds
 packet_error_rate = 0
 
 [eth1]
-eth_id = 136.142.227.15.2
+eth_id = 136.142.227.15.1
 netmask = 255.255.255.128
 direct_link_addr = 136.142.227.14 # remote host ip (router_id)
 direct_link_type = 0 # 0 is router, 1 is end system, default is 0
