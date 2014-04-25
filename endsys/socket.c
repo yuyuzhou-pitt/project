@@ -264,11 +264,13 @@ void socket_rcvFile()
 		{
     		Packet recieved;
     		Recv(client_fd,&recieved,sizeof(recieved),0);
+                printf("socket_sendFile: got packet from %s with type %s\n", recieved.RouterID, recieved.PacketType);
 		struct packet pkt = convertCharToPacket(recieved);
 		if(lsrp_incomingmessage(pkt) == 0)
 		{
 			Packet ack = convertPacketToChar(lsrp_createACK(pkt));
 			Send(client_fd, &ack, sizeof(ack),0);
+                        printf("socket_sendFile: send ack from %s with type %s\n", ack.RouterID, ack.PacketType);
     			//close(client_fd); // do not close client socket 
 			//cont = 0;
 		}
@@ -307,8 +309,10 @@ void socket_sendFile(char * hostname, int port, struct packet pkg)
     { 
 	Packet toSend = convertPacketToChar(pkg);
         sendbytes = Send(sockfd,&toSend,sizeof(toSend), 0);
+        printf("socket_sendFile: send packet from %s with type %s\n", toSend.RouterID, toSend.PacketType);
 	Packet recv;
         Recv(sockfd,&recv,sizeof(recv), 0); 
+        printf("socket_sendFile: got ack from %s with type %s\n", recv.RouterID, recv.PacketType);
         _exit(0);
     }
     else
