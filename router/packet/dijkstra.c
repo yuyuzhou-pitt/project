@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
+#include <unistd.h>
 #include "dijkstra.h"
 #include "../config/liblog.h"
 
@@ -34,11 +35,17 @@ int scanfile(char *filename, records nlist[])
     int i=0,j=0,n_id,n_cost;
     nodes *temp=0,*temp1=0;
 
+    if(access(filename, F_OK) < 0) {
+        printf("ERROR: scanfile: File not found: %s\n", filename);
+        return -1;
+    }
+
     if((f=fopen(filename,"r"))== NULL)
     {
         printf("Error opening file.\n");
-        exit(1);
+        return -1;
     }
+
     memset(nlist, 0, sizeof(struct record) * MAX_NODES);
     int count=0;
     do /*first get the id and address of all nodes*/
