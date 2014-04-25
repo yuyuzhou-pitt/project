@@ -335,3 +335,68 @@ void socket_sendFile(char * hostname, int port, struct packet pkg)
     close(sockfd);
     free(pkg.data);
 }
+
+
+/* ---- TEMP CODE
+
+    int sockfd,sendbytes,recvbytes;
+    struct hostent *host;
+    struct sockaddr_in sockaddr;
+    int setupComplete = 0;
+
+void socket_sendFile(char * hostname, int port, struct packet pkg)
+{
+
+if(setupComplete == 0)
+{
+    if ((host = gethostbyname(hostname)) == NULL){
+        perror("gethostbyname");
+        exit(1);
+    }
+    sockfd = Socket(AF_INET, SOCK_STREAM, 0);
+
+    sockaddr.sin_family = AF_INET;
+    sockaddr.sin_port = htons(port);
+    sockaddr.sin_addr = *((struct in_addr *)host->h_addr);
+    bzero(&(sockaddr.sin_zero), 8);         
+
+    Connect(sockfd,sockaddr,sizeof(sockaddr));
+    setupComplete = 1;
+}
+    int pid = 0;
+    int cont = 1;
+    while(cont == 1)
+    {
+    if((pid = fork()) == 0)
+    { 
+	Packet toSend = convertPacketToChar(pkg);
+       sendbytes = Send(sockfd,&toSend,sizeof(toSend), 0);
+	Packet recv;
+        Recv(sockfd,&recv,sizeof(recv), 0); 
+        _exit(0);
+    }
+    else
+    {
+	int i = 0;
+	while( i < timeout*10)
+	{
+	int status;
+	if(waitpid(pid, &status, WNOHANG)  > 0){
+		cont = 0;
+		break;
+	}
+	usleep(100); //timeout
+	i++;
+	}
+	if(cont == 1)
+	{
+	printf("#ERROR: Timeout occurred. Resending packet. \n");
+	kill(pid, SIGKILL);
+	}
+	
+    }
+    }
+    //close(sockfd);
+    free(pkg.data);
+}
+*/
