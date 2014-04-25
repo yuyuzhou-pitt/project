@@ -13,24 +13,25 @@ cc *.o -o endSystem  -lsocket -lnsl
 
 This compiles the files into .o files then combines them into an application named endSystem
 
+This can be done through the readme by running
+
+make -f Makefile
 
 ------------------------------------------------------------------------
 Running:
 
 This was tested on unixs.cis.pitt.edu. Can be run via the following command.
 
-./endSystem <1>
+./endSystem
 
 This will startup the endSystem. It will create the values required for checksum, aquire a port to listen on,
 read the config files and start listening for commands. 
-
-If <1> is provided then debug information is turned on.
 
 In order to see a list of all possible instructions type "help" and hit return
 
 To exit type "exit" and hit return
 
-NOTE: In lsrp.cfg only the packet_error_rate is anaylzed.
+NOTE: In lsrp.cfg only the packet_error_rate and ech0_direct_link_addr is anaylzed. More is checked in the routers.
 
 ------------------------------------------------------------------------
 List of commands:
@@ -52,6 +53,7 @@ checksum.c/checksum.h	-- Code provided by Professor Znati
 commonItems.c/commonItems.h -- Contains all information common to multiple files - structs, timeout, edge router, etc.
 endSystem.c 		-- Contains the main method. Calls the setup and waits for user commands
 libsocket.c/libsocket.h -- This provides wrappers around the socket calls
+liblog.c/liblog.h 	-- Our logging method
 lsrp.c/lsrp.h		-- Converts from data segments to packets and back up. Adds errors if packet_error_rate is set > 0
 sw.c/sw.h		-- Converts from messages to data segments and back up. 
 socket.c/socket.h	-- Sends and recieves data using forked processes. Does the final stage of converting packet to char array. 
