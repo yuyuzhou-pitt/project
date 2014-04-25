@@ -1,0 +1,100 @@
+Pay atention:
+1. Do NOT start end system unless routing table generated correctly on ALL routers
+2. Use "make clean" and then restart ALL the routers and endsystem before each demo
+
+
+Environment:
+http://people.cs.pitt.edu/~tech/news/faqs.html#hp01
+
+Routers:
+rhenium.cs.pitt.edu (136.142.227.12)
+neptunium.cs.pitt.edu (136.142.227.13)
+neodymium.cs.pitt.edu (136.142.227.14)
+nickel.cs.pitt.edu (136.142.227.15)
+
+End System:
+hydrogen.cs.pitt.edu (136.142.227.11)
+oxygen.cs.pitt.edu (136.142.227.10)
+
+Case 1: Transfer File:
+
+Topology:
+
+                             +------+
+                             |Router|
+                             |.14   |
+                             +------+
+                             //\ /\\
+                           \//     \\/
++---+     +------+     +------+     +------+     +---+
+|End|---->|Router|---->|Router|---->|Router|---->|End|
+|.10|<----|.12   |<----|.13   |<----|.15   |<----|.11|
++---+     +------+     +------+     +------+     +---+
+
+
+Steps:
+1. Set up the configuration file according to the topology:
+config/lsrp-router.cfg.12.endsys
+config/lsrp-router.cfg.13
+config/lsrp-router.cfg.14
+config/lsrp-router.cfg.15.endsys
+
+2. Build and start up all the routers:
+$ cd project/router/
+$ make clean
+$ make
+$ ./lsrp-router config/lsrp-router.cfg.13
+
+Note: use 'tail -f router/lsrp-router.cfg' to see the background log message.
+
+3. Wait until all the routing generated correctly (take .14 for example)
+showRouting: routing_size: 3
+Destination	Gateway    	Metric(us)	Iface
+136.142.227.13	136.142.227.13	1030	136.142.227.14.0
+136.142.227.15	136.142.227.13	7362	136.142.227.14.0
+136.142.227.12	136.142.227.13	32262	136.142.227.14.0
+
+4. Build and start all the end system:
+$ cd project/endsys
+$ make (remove '-lsocket' on Linux system)
+$ ./endSystem
+
+5. Set edge router on end system
+on .10
+$ cat ../.136.142.227.12
+$ set-edge-router 136.142.227.12 <.12-port>
+on .11
+$ cat ../.136.142.227.15
+$ set-edge-router 136.142.227.15 <.15-port>
+
+6. Transfer file from .10 to .11:
+on .10:
+$ sendfile test.txt 136.142.227.11:test11.txt
+
+Case 2: Link Failure:
+
+                             +------+
+                             |Router|
+                             |.14   |
+                             +------+
+                             //\ /\\
+                           \//     \\/
++---+     +------+     +------+     +------+     +---+
+|End|---->|Router|---->|Router|--X->|Router|---->|End|
+|.10|<----|.12   |<----|.13   |<-X--|.15   |<----|.11|
++---+     +------+     +------+     +------+     +---+
+
+7. disable the link between .13 and .15:
+on .13
+$ disablelink 1 (the eth index connected to .15)
+on .15
+$ disablelink 0 (the eth index connected to .13)
+
+8. check the status on this link:
+$ showcfg (for [eth0], link_availability = 0)
+$ showlsdb (for both .13 -> .15 and .15 -> .13, the 'Avail' column = 0)
+
+9. check the new routing table:
+$ showrt (the new routing goes through .14 now) (suppose all the link has the same Metric)
+
+10. repeat step 6 to transfer the file again
