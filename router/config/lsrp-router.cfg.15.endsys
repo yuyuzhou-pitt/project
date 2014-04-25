@@ -1,0 +1,49 @@
+# NOTE: 1) update ETHX in config.h if more interfaces defined here 
+#       2) value does NOT have "" even it's a string 
+
+[Global config]
+router_id = 136.142.227.15
+protocol_version = 1.0
+acquisition_authorization = password
+hello_interval = 10 # in seconds
+ping_interval = 20 # 60 seconds
+ping_alpha = 0.5 # to calculate the average ping cost
+ping_timeout = 10 # in seconds
+ls_updated_interval = 30 # in seconds
+ls_age_limit = 60 #in seconds
+hold_down_timer = 60 #in seconds
+num_of_interface = 3
+
+[interface config]
+[eth0]
+eth_id = 136.142.227.15.1
+netmask = 255.255.255.128
+direct_link_addr = 136.142.227.13 # remote host ip (router_id)
+direct_link_type = 0 # 0 is router, 1 is end system, default is 0
+link_availability = 1 # default is avail
+link_cost_method = manual # auto - calculated by  ping delay, manual - manual setting
+link_cost = 9999 # infinit
+link_failure_time = 60 # seconds
+packet_error_rate = 0
+
+[eth1]
+eth_id = 136.142.227.15.2
+netmask = 255.255.255.128
+direct_link_addr = 136.142.227.14 # remote host ip (router_id)
+direct_link_type = 0 # 0 is router, 1 is end system, default is 0
+link_availability = 1 # default is avail
+link_cost_method = manual # auto - calculated by  ping delay, manual - manual setting
+link_cost = 9999 # infinit
+link_failure_time = 60 # seconds
+packet_error_rate = 0
+
+[eth2]
+eth_id = 136.142.227.13.3
+netmask = 255.255.255.128
+direct_link_addr = 136.142.227.11 # remote host ip (router_id)
+direct_link_type = 1 # 0 is router, 1 is end system, default is 0
+link_availability = 1 # default is avail
+link_cost_method = manual # auto - calculated by  ping delay, manual - manual setting
+link_cost = 9999 # infinit
+link_failure_time = 60 # seconds
+packet_error_rate = 0
