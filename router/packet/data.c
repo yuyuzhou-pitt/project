@@ -15,8 +15,10 @@ int sendBufferData(int sockfd, Packet_Buff *buffer){
     Packet *packet;
     if(buffer->buffsize > 0){
         packet = (Packet *)dequeue(buffer->packet_q);
+        //printf("sendBufferData: packet sent: %s\n", packet->RouterID);
         Send(sockfd, packet, sizeof(Packet), MSG_NOSIGNAL);
         buffer->buffsize--;
+        //printf("sendBufferData: buffer->buffsize = %d\n", buffer->buffsize);
     }
     else{
         char logmsg[128]; 
@@ -31,18 +33,17 @@ int addBufferData(ThreadParam *threadParam, Packet *packet){
     char target_router[32];
     char logmsg[128];
     memset(target_router, 0, sizeof(target_router));
+    //printf("addBufferData: packet->Data.des_ip :%s\n",  packet->Data.des_ip);
 
     /* check target is end-system-ethx or not */
     int k;
     for(k=0;k< threadParam->router->num_of_interface;k++){
-        //printf("addBufferData: packet->Data.src_ip :%s\n",  packet->Data.src_ip);
-        //printf("addBufferData: packet->Data.des_ip :%s\n",  packet->Data.des_ip);
         if(strcmp(packet->Data.des_ip, threadParam->router->ethx[k].direct_link_addr) == 0){
             snprintf(logmsg, sizeof(logmsg), "addBufferData: packet %s enqueued into endsystem buffer[%d].packet_q\n", packet->RouterID, k);
             logging(LOGFILE, logmsg);
-            enqueue(threadParam->buffer[k].packet_q, packet);
-            threadParam->buffer[k].buffsize++;
-            //printf("addBufferData:(to endsys) buffer[%d].buffsize = %d\n",k, threadParam->buffer[k].buffsize);
+            enqueue(threadParam->data_buffer[k].packet_q, packet);
+            threadParam->data_buffer[k].buffsize++;
+            //printf("addBufferData:(to endsys) buffer[%d].buffsize = %d\n",k, threadParam->data_buffer[k].buffsize);
 
             return 0;
         }
@@ -70,11 +71,11 @@ int addBufferData(ThreadParam *threadParam, Packet *packet){
             /* found interface for buffer index */
             for(j=0;j< threadParam->router->num_of_interface;j++){
                 if(strcmp(threadParam->routing[i].Interface, threadParam->router->ethx[j].eth_id) == 0){
-                    snprintf(logmsg, sizeof(logmsg), "addBufferData: packet %s enqueued into threadParam->buffer[%d].packet_q\n", packet->RouterID, j);
+                    snprintf(logmsg, sizeof(logmsg), "addBufferData: packet %s enqueued into threadParam->data_buffer[%d].packet_q\n", packet->RouterID, j);
                     logging(LOGFILE, logmsg);
-                    enqueue(threadParam->buffer[j].packet_q, packet);
-                    threadParam->buffer[j].buffsize++;
-                    //printf("addBufferData:(to router)buffer[%d].buffsize = %d\n",j, threadParam->buffer[j].buffsize);
+                    enqueue(threadParam->data_buffer[j].packet_q, packet);
+                    threadParam->data_buffer[j].buffsize++;
+                    //printf("addBufferData:(to router)buffer[%d].buffsize = %d\n",j, threadParam->data_buffer[j].buffsize);
 
                     return 0;
                 }

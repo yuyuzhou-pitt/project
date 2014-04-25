@@ -57,10 +57,3 @@ int listsize(Packet_Q *head){
     }
     return len;
 }
-
-/* add LSA ack into buffer */
-int addBufferACK(ThreadParam *threadParam, Packet *packet_ack, int ethx){
-    enqueue(threadParam->buffer[ethx].packet_q, packet_ack);
-    threadParam->buffer[ethx].buffsize++;
-    return 0;
-}

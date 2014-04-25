@@ -133,9 +133,7 @@ int installLSA(ThreadParam *threadParam, Packet *packet_req){
 }
 
 int sendNewLSA(int sockfd, ThreadParam *threadParam, int ls_sequence_number, struct timeval timer){
-//int sendNewLSA(int sockfd, Router *router, int ls_sequence_number, struct timeval timer, int port, char *remote_server){
     Packet *lsa_packet;
-    //lsa_packet = genLSAMsg(router, ls_sequence_number, timer, port, remote_server); // msg to be sent out
 
     lsa_packet = genLSAMsg(threadParam, ls_sequence_number, timer); // msg to be sent out
     /* add into LS DB before send out */
@@ -156,11 +154,11 @@ int sendBufferLSA(int sockfd, Packet_Buff *buffer){
     char logmsg[128]; 
     if(buffer->buffsize > 0){
         lsa_packet = (Packet *)dequeue(buffer->packet_q);
-        //printf("sendBufferLSA: packet sent: %s\n", lsa_packet->Data.Advertising_Router_ID);
         r = Send(sockfd, lsa_packet, sizeof(Packet), MSG_NOSIGNAL);
-        buffer->buffsize--;
-        snprintf(logmsg, sizeof(logmsg), "sendBufferLSA:buffer->buffsize = %d\n",buffer->buffsize);
+        snprintf(logmsg, sizeof(logmsg), "sendBufferLSA: packet sent: %s\n", lsa_packet->Data.Advertising_Router_ID);
         logging(LOGFILE, logmsg);
+        buffer->buffsize--;
+        //printf("sendBufferLSA:buffer->buffsize = %d\n",buffer->buffsize);
     }
     else{
         snprintf(logmsg, sizeof(logmsg), "sendBufferLSA: Buffer is empty.");
@@ -198,37 +196,31 @@ int addBufferFlood(ThreadParam *threadParam, Packet *packet, int ethx, struct ti
 
             /* do not use same link to send back */
             if(i != ethx){
-                enqueue(threadParam->buffer[i].packet_q, packet);
-                //printf("addBufferflood:threadParam->buffer[i].packet_q->next->packet->RouterID = %s\n",threadParam->buffer[i].packet_q->next->packet->RouterID);
-                threadParam->buffer[i].buffsize++;
-                snprintf(logmsg, sizeof(logmsg), "addBufferflood:threadParam->buffer[%d].buffsize = %d\n",i, threadParam->buffer[i].buffsize);
+                pthread_mutex_lock(&threadParam->lsa_buffer[i].lock_buffer);
+                enqueue(threadParam->lsa_buffer[i].packet_q, packet);
+                //printf("addBufferflood:threadParam->lsa_buffer[i].packet_q->next->packet->RouterID = %s\n",threadParam->lsa_buffer[i].packet_q->next->packet->RouterID);
+                threadParam->lsa_buffer[i].buffsize++;
+                pthread_mutex_unlock(&threadParam->lsa_buffer[i].lock_buffer);
+                snprintf(logmsg, sizeof(logmsg), "addBufferflood:threadParam->lsa_buffer[%d].buffsize = %d\n",i, threadParam->lsa_buffer[i].buffsize);
                 logging(LOGFILE, logmsg);
             }
 
         }
     }
-/*
-    if(isDirect == 0){
-        for (i=0;i < threadParam->router->num_of_interface; i++){
-            if(i != ethx){
-                enqueue(threadParam->buffer[i].packet_q, packet);
-                //printf("addBufferflood:threadParam->buffer[i].packet_q->next->packet->RouterID = %s\n",threadParam->buffer[i].packet_q->next->packet->RouterID);
-                threadParam->buffer[i].buffsize++;
-                printf("addBufferflood:threadParam->buffer[i].buffsize = %d\n",threadParam->buffer[i].buffsize);
-            }
-        }
-    }
-*/
     return 0;
 }
 
 /* for dijkstra algo */
-int genGraph(ThreadParam *threadParam){
+int genGraph(ThreadParam *threadParam, char *ipstr){
+    char graphfile[32];
+    memset(graphfile, 0, sizeof(graphfile));
+    snprintf(graphfile, sizeof(graphfile), ".%s", ipstr);
+    strncat(graphfile, GRAPHOSPF, strlen(GRAPHOSPF));
     char graphStr[2048];
     memset(graphStr, 0, sizeof(graphStr));
 
     FILE *fp;
-    if((fp=fopen(GRAPHOSPF, "w"))<0){
+    if((fp=fopen(graphfile, "w"))<0){
         char logmsg[128]; 
         snprintf(logmsg, sizeof(logmsg), "genGraph: fail to open file: %s\n", GRAPHOSPF);
         logging(LOGFILE, logmsg);
@@ -343,10 +335,12 @@ int portToNetmask(char *netmask, ThreadParam *threadParam, int src_port, int des
 }
 
 /* generate routing table based on ls database and dijkstra algo */
-int genRouting(ThreadParam *threadParam){
+int genRouting(ThreadParam *threadParam, char *ipstr){
+    char graphfile[32];
+    memset(graphfile, 0, sizeof(graphfile));
+    snprintf(graphfile, sizeof(graphfile), ".%s", ipstr);
+    strncat(graphfile, GRAPHOSPF, strlen(GRAPHOSPF));
 
-    char routerid[32], netmask[32], gatewayid[2], interface[32];
-    int rRouterid, rNetmask, rGatewayid, rInterface;
     int gateway, metric;
     
     records nlist[MAX_NODES+1]={0}; //create array of records and mark the end of the array with zero.
@@ -354,12 +348,20 @@ int genRouting(ThreadParam *threadParam){
 
     int count; //stores number of nodes
 
-    count = scanfile(GRAPHOSPF, nlist);
+    count = scanfile(graphfile, nlist);
     djkstra(nlist, count);
     //view(nlist);
 
     char tmpStr[32];
     memset(tmpStr, 0, sizeof(tmpStr));
+
+    int rRouterid, rNetmask, rGatewayid, rInterface;
+    char routerid[32], netmask[32], gatewayid[2], interface[32];
+    memset(routerid, 0, sizeof(routerid));
+    memset(netmask, 0, sizeof(netmask));
+    memset(gatewayid, 0, sizeof(gatewayid));
+    memset(interface, 0, sizeof(interface));
+
     memset(threadParam->routing, 0, 128*sizeof(Routing_Table));
     int k = 0;
     //int k = threadParam->routing_size;

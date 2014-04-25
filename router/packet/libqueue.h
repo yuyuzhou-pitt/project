@@ -14,6 +14,7 @@ typedef struct Packet_Queue{
 
 typedef struct Packet_Buffer{
     int buffsize;
+    pthread_mutex_t lock_buffer;
     Packet_Q *packet_q;
 }Packet_Buff;
 
@@ -22,18 +23,20 @@ typedef struct Thread_Parameters{
     int sockfd; // record the sockfd for client thread
     int port; // record the port for client thread use
     Router *router;
-    Packet_Buff buffer[ETHX]; // group buffer according to ethx
+    Packet_Buff lsa_buffer[ETHX]; // group buffer according to ethx
+    Packet_Buff data_buffer[ETHX]; // group buffer according to ethx
     int ls_db_size;
     LS_DB ls_db[DBMAX]; // recording the whole ls db
     int graph_line_size;
     Graph_Line graph_line[ETHX];
     int routing_size;
     Routing_Table routing[ETHX]; // recording local routing table
-    pthread_mutex_t lock;
+
     pthread_mutex_t lock_send;
-    pthread_mutex_t lock_endsys;
-    pthread_mutex_t lock_buffer;
-    pthread_mutex_t lock_server;
+    pthread_mutex_t lock_port;
+    pthread_mutex_t lock_router;
+    pthread_mutex_t lock_graph;
+
 }ThreadParam;
 
 Packet_Q *initlist();
