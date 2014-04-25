@@ -133,20 +133,11 @@ Router *getRouter(char *filename){
     return router;
 }
 
-int writeRouter(char *filename, Router *router){
-    copyFile(filename, "lsrp-router.cfg.bk");
 
-    FILE *fp;
-
-    if ((fp = fopen(filename,"wt")) < 0){
-        char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "writeRouter: Failed to open file: %s\n", filename);
-        logging(LOGFILE, logmsg);
-        return -1;
-    }
-
-    char routerStr[8192];
-    memset(routerStr, 0, sizeof(routerStr));
-    snprintf(routerStr, sizeof(routerStr), "\
+int routerToStr(Router *router, char *routerStr){
+    char rStr[2048];
+    memset(rStr, 0, sizeof(rStr));
+    snprintf(rStr, sizeof(rStr), "\
 # NOTE: 1) please update num_of_interface when adding new interfaces \n\
 #       2) value does NOT have \"\" even it's a string type \n\
 #       3) eth_id identifies the link, set it UNIQUE please \n\
@@ -170,6 +161,7 @@ num_of_interface = %d\n\
     router->ping_timeout, router->ls_updated_interval, \
     router->ls_age_limit, router->hold_down_timer, router->num_of_interface);
 
+    strncpy(routerStr, rStr, strlen(rStr));
 
     /* generate the Ethernet part */
     int i;
@@ -194,7 +186,22 @@ packet_error_rate = %d\n\
 
        strncat(routerStr, ethxStr, strlen(ethxStr)); // add ethx information to router
     }
+}
 
+int writeRouter(char *filename, Router *router){
+    copyFile(filename, "lsrp-router.cfg.bk");
+
+    FILE *fp;
+
+    if ((fp = fopen(filename,"wt")) < 0){
+        char logmsg[128]; snprintf(logmsg, sizeof(logmsg), "writeRouter: Failed to open file: %s\n", filename);
+        logging(LOGFILE, logmsg);
+        return -1;
+    }
+
+    char routerStr[8192];
+    memset(routerStr, 0, sizeof(routerStr));
+    routerToStr(router, routerStr);
     fwrite(strstrip(routerStr), 1 , strlen(strstrip(routerStr)) , fp );
 
     fclose(fp);
@@ -341,19 +348,45 @@ int showHelp(){
     printf("  help      show this message\n");
     printf("  quit      stop this router and quit\n");
     printf("  showlsdb  show link state database\n");
-    printf("  showrt    show routing table\n\n");
+    printf("  showrt    show routing table\n");
+    printf("  showcfg   show router configuration\n");
+    printf("  enablelink <ethx> \n"); 
+    printf("            to enable the specified link by setting ethx[ethx].link_availability = 1\n");
+    printf("            <ethx> could be 0, 1, ... e.g.: 'enablelink 1' will enable eth1\n"); 
+    printf("  disablelink <ethx> \n"); 
+    printf("            to disable the specified link by setting ethx[ethx].link_availability = 0\n");
+    printf("            <ethx> could be 0, 1, ... e.g.: 'disablelink 1' will disable eth1\n\n"); 
 
     return 0;
 }
 
 int quitRouter(){
     char confirm[4];
-    printf("This command will stop this router, please confirm: [y/N]");
+    fprintf(stdout, "This command will stop this router, please confirm: [y/N]");
     scanf("%c", confirm);
     if(strcmp(confirm, "y") == 0){
         return 0;
     }
     return 1;
+}
+
+int disableLink(Router *router, int ethx){
+    router->ethx[ethx].link_availability = 0;
+    fprintf(stdout, "eth%d disabled. NOTE: link will be unavailable on both local or remote side\n");
+    fprintf(stdout, "please run 'showcfg' and 'showlsdb' to show the detail\n\n", ethx);
+}
+
+int enableLink(Router *router, int ethx){
+    router->ethx[ethx].link_availability = 1;
+    fprintf(stdout, "eth%d enabled. NOTE: link will be availible on both local and remote side\n");
+    fprintf(stdout, "please run 'showcfg' and 'showlsdb' to show the detail\n\n", ethx);
+}
+
+int showCFG(Router *router){
+    char routerStr[8192];
+    memset(routerStr, 0, sizeof(routerStr));
+    routerToStr(router, routerStr);
+    printf("%s\n",routerStr);
 }
 
 /*
