@@ -137,7 +137,10 @@ int sendNewLSA(int sockfd, ThreadParam *threadParam, int ls_sequence_number, str
 
     lsa_packet = genLSAMsg(threadParam, ls_sequence_number, timer); // msg to be sent out
     /* add into LS DB before send out */
+    //pthread_mutex_lock(&threadParam->lock_ls_db);
     installLSA(threadParam, lsa_packet);
+    //pthread_mutex_unlock(&threadParam->lock_ls_db);
+
     //printf("sendNewLSA: send LSA packet %s with type %s\n", lsa_packet->RouterID, lsa_packet->PacketType);
     //printf("sendLSA: lsa_packet->PacketType = %s\n", lsa_packet->PacketType);
     return Send(sockfd, lsa_packet, sizeof(Packet), MSG_NOSIGNAL);
@@ -232,10 +235,16 @@ int genGraph(ThreadParam *threadParam, char *ipstr){
 
     memset(line, 0, 128*sizeof(Graph_Line));
     int i,j,iLine,iSize = 0;
+
+    /* generate graph table */
     for(i=0;i < threadParam->ls_db_size;i++){
-        /* skip if port is 0 */
+        /* skip if 
+         * 1) port is 0 
+         * 2) connects to end system
+         * 3) interface is disabled (Avail is 0) */
         if(threadParam->ls_db[i].src_port_id != 0 && threadParam->ls_db[i].des_port_id != 0 &&
-           strcmp(threadParam->ls_db[i].Link_ID, "end-system-ethx ") != 0){
+           strcmp(threadParam->ls_db[i].Link_ID, "end-system-ethx ") != 0 &&
+           threadParam->ls_db[i].Availability != 0){
             int isExist = 0;
             char templine[16];
             memset(templine, 0, sizeof(templine));
@@ -257,9 +266,9 @@ int genGraph(ThreadParam *threadParam, char *ipstr){
                 iSize++;
             }
     
+            /* add <des_node>-<cost> */
             snprintf(templine, sizeof(templine), ":%d-%d", threadParam->ls_db[i].des_port_id, \
                threadParam->ls_db[i].Link_Cost.tv_sec * 1000000 + threadParam->ls_db[i].Link_Cost.tv_usec);
-            // add <des_node>-<cost>
             strncat(line[iLine].lineStr, templine, strlen(templine));
             //printf("genGraph:line[%d].lineStr: %s\n", iLine, line[iLine].lineStr);
         }
@@ -286,7 +295,7 @@ int genGraph(ThreadParam *threadParam, char *ipstr){
         strncat(graphStr, tempStr, strlen(tempStr));
     }
 
-    //printf("genGraph:\n%s\n", graphStr);
+    //printf("genGraph:\n%s\n\n", graphStr);
 
     fwrite(strstrip(graphStr), 1 , strlen(strstrip(graphStr)) , fp );
 
