@@ -37,7 +37,8 @@
 int main(int argc, char *argv[]){
 
     /* use default cfg file if not given */
-    char *lsrpcfg = "config/lsrp-router.cfg";
+    char lsrpcfg[128];
+    memset(lsrpcfg, 0, sizeof(lsrpcfg));
 
     /* read cfg file first */
     Router *router;
@@ -48,12 +49,14 @@ int main(int argc, char *argv[]){
     }
     else if(argc == 2) {
         fprintf(stdout, "(lsrp-router): use router cfg file: %s\n", argv[1]);
-        router = getRouter(argv[1]);
+        strncpy(lsrpcfg, argv[1], strlen(argv[1]));
     }
     else {
+        strncpy(lsrpcfg, "config/lsrp-router.cfg", sizeof(lsrpcfg));
         fprintf(stdout, "(lsrp-router): use default router cfg file: %s\n", lsrpcfg);
-        router = getRouter(lsrpcfg);
     }
+
+    router = getRouter(lsrpcfg);
 
     ThreadParam *threadParam;
     threadParam = (ThreadParam *)calloc(1, sizeof(ThreadParam));
@@ -62,8 +65,10 @@ int main(int argc, char *argv[]){
     threadParam->router = router;
     int i;
     for(i=0;i < router->num_of_interface;i++){
-        threadParam->buffer[i].buffsize = 0; 
-        threadParam->buffer[i].packet_q = initlist();
+        threadParam->lsa_buffer[i].buffsize = 0; 
+        threadParam->data_buffer[i].buffsize = 0; 
+        threadParam->lsa_buffer[i].packet_q = initlist();
+        threadParam->data_buffer[i].packet_q = initlist();
     }
 
     /* Thread attribute */
@@ -90,32 +95,61 @@ int main(int argc, char *argv[]){
         //sleep(1);
     }
     fprintf(stdout, "(lsrp-router): please track log file for detail: %s\n", LOGFILE);
+    fprintf(stdout, "\n== WELCOME TO LSRP ROUTER CONFIGURATION TERMINAL! ==\n");
+    fprintf(stdout, "\nEnter the commands 'help' for usage.\n\n");
+
     
     int rc;
     char command[64], arguments[64];
     int terminal = 1;
-    showHelp();
+    char *split1, *split2, *strsplit;
     while(terminal == 1){
-        fprintf(stdout, "(lsrp-router)# ");
-        //fprintf(stdout, "\nEnter the commands ('help' for usage): \n(lsrp-router)# ");
+        fprintf(stdout, "(lsrp-router: %s)# ", router->router_id);
 	fflush(stdin);
 	if (fgets(command, sizeof(command), stdin) != NULL ){
-            if(strcmp(command, "quit\n") == 0){ // there is a \n in the stdin
+            strsplit = command;
+            split1 = strtok_r(strsplit, " ", &split2);
+
+            if(strcmp(split1, "quit\n") == 0){ // there is a \n in the stdin
                 /* TODO: clean threads before quit terminal */
                 if((terminal = quitRouter()) == 0){
                     break;
                 }
             }
-            if(strcmp(command, "help\n") == 0){ // there is a \n in the stdin
+            else if(strcmp(split1, "help\n") == 0){ // there is a \n in the stdin
                 showHelp();
             }
-            if(strcmp(command, "showlsdb\n") == 0){ // there is a \n in the stdin
+            else if(strcmp(split1, "showlsdb\n") == 0){ // there is a \n in the stdin
                 showLSDB(threadParam);
             }
-            if(strcmp(command, "showrt\n") == 0){ // there is a \n in the stdin
+            else if(strcmp(split1, "showrt\n") == 0){ // there is a \n in the stdin
                 showRouting(threadParam);
             }
-
+            else if(strcmp(split1, "showcfg\n") == 0){ // there is a \n in the stdin
+                showCFG(router, lsrpcfg);
+            }
+            else if(strcmp(split1, "enablelink") == 0){ // there is a \n in the stdin
+                if(isdigit(split2[0]) == 0){
+                    fprintf(stderr, "ERROR: input is not integer: %s\n", split2);
+                }
+                else{
+                    enableLink(router, atoi(split2));
+                    writeRouter(lsrpcfg, router);
+                }
+            }
+            else if(strcmp(split1, "disablelink") == 0){ // there is a \n in the stdin
+                if(isdigit(split2[0]) == 0){
+                    fprintf(stderr, "ERROR: input is not integer: %s\n", split2);
+                }
+                else{
+                    disableLink(router, atoi(split2));
+                    writeRouter(lsrpcfg, router);
+                }
+            }
+            else if(strcmp(split1, "\n") != 0){ // there is a \n in the stdin
+                fprintf(stderr, "ERROR: command not found: %s\n", split1);
+                showHelp();
+            }
 
         }
         else{
