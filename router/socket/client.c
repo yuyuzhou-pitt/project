@@ -51,7 +51,7 @@ void *sockclient(void *arg){
     while(1){
         int iEthx;
         memset(portstr, 0, sizeof(portstr)); 
-        pthread_mutex_lock(&threadParam->lock); // Critical section to read port files
+        pthread_mutex_lock(&threadParam->lock_port); // Critical section to read port files
         /* Steps:
          * 1) go through all the direct_link_addr in cfg file
          * 2) if port file do NOT exists, busy wait
@@ -140,7 +140,7 @@ void *sockclient(void *arg){
                 }
             }
         }
-        pthread_mutex_unlock(&threadParam->lock); // Critical section end
+        pthread_mutex_unlock(&threadParam->lock_port); // Critical section end
     
         sleep(READ_PORT_INTERVAL);
 
@@ -153,27 +153,35 @@ void *sockclient(void *arg){
         logging(LOGFILE, logmsg);
     }
 
-    //pthread_mutex_lock(&lock_endsys);
     /* deal with end sys */
     if(endsysEthx != -1 ){
+        int needACK;
         while(1){
+            needACK = 0;
             /* read data from buffer */
-            pthread_mutex_lock(&threadParam->lock_buffer);
-            if(threadParam->buffer[endsysEthx].buffsize > 0){
-                //printf("sockclient(0x%x): threadParam->buffer[%d].buffsize: %d, type of the first item: %s\n", 
-                //    pthread_self(), endsysEthx, threadParam->buffer[endsysEthx].buffsize,
-                //    threadParam->buffer[endsysEthx].packet_q->next->packet->PacketType);
+            pthread_mutex_lock(&threadParam->data_buffer[endsysEthx].lock_buffer);
+            if(threadParam->data_buffer[endsysEthx].buffsize > 0){
+                //printf("sockclient(0x%x): threadParam->data_buffer[%d].buffsize: %d, type of the first item: %s\n", 
+                //    pthread_self(), endsysEthx, threadParam->data_buffer[endsysEthx].buffsize,
+                //    threadParam->data_buffer[endsysEthx].packet_q->next->packet->PacketType);
 
                 /* out going buffer devided by interface, maybe there are other type of packet exists */
                 /* do not handle ACK (110), let server side to deal with it */
-                if(strcmp(threadParam->buffer[endsysEthx].packet_q->next->packet->PacketType, "100") == 0){
-                    snprintf(logmsg, sizeof(logmsg), "sockclient(0x%x): forward File with type %s from %s to endsystem %s through ethx %d\n",
-                        pthread_self(), threadParam->buffer[endsysEthx].packet_q->next->packet->PacketType,
-                        threadParam->buffer[endsysEthx].packet_q->next->packet->RouterID, remote_server, endsysEthx);
-                    logging(LOGFILE, logmsg);
+                if(strcmp(threadParam->data_buffer[endsysEthx].packet_q->next->packet->PacketType, "100") == 0){
+                    //snprintf(logmsg, sizeof(logmsg), "sockclient(0x%x): forward File with type %s from %s to endsystem %s through ethx %d\n",
+                    printf("sockclient(0x%x): forward File with type %s from %s to endsystem %s through ethx %d\n",
+                        pthread_self(), threadParam->data_buffer[endsysEthx].packet_q->next->packet->PacketType,
+                        threadParam->data_buffer[endsysEthx].packet_q->next->packet->RouterID, remote_server, endsysEthx);
+                    //logging(LOGFILE, logmsg);
 
-                    sendBufferData(clientfd, &threadParam->buffer[endsysEthx]);
+                    sendBufferData(clientfd, &threadParam->data_buffer[endsysEthx]);
 
+                    needACK = 1;
+                }
+            }
+            pthread_mutex_unlock(&threadParam->data_buffer[endsysEthx].lock_buffer);
+
+            if(needACK == 1){
                     Packet *packet_ack;
                     packet_ack= (Packet *)malloc(sizeof(Packet));
 
@@ -185,20 +193,21 @@ void *sockclient(void *arg){
                         // data, addBuff();
                         //Thans_Data trans_data = (Trans_Data)packet->Data;
                         //getEthx(router, trans_data.des_ip); // calculate the out interface according to the routing table
-                        snprintf(logmsg, sizeof(logmsg), "serverthread(0x%x): got ack data from %s, enqueue...\n", 
+                        //snprintf(logmsg, sizeof(logmsg), "serverthread(0x%x): got ack data from %s, enqueue...\n", 
+                        printf("serverthread(0x%x): got ack data from %s, enqueue...\n", 
                                  pthread_self(), packet_ack->RouterID);
-                        logging(LOGFILE, logmsg);
+                        //logging(LOGFILE, logmsg);
                         repackData(router, packet_ack);
+                        pthread_mutex_lock(&threadParam->data_buffer[endsysEthx].lock_buffer);
                         addBufferData(threadParam, packet_ack);
+                        pthread_mutex_unlock(&threadParam->data_buffer[endsysEthx].lock_buffer);
                     }
                     else{
                         snprintf(logmsg, sizeof(logmsg), "sockclient(0x%x): data is not ack.\n", pthread_self());
                         logging(LOGFILE, logmsg);
                     }
-                    
-                }
             }
-            pthread_mutex_unlock(&threadParam->lock_buffer);
+
             usleep(1); //sleep some time for lock relase
         }
     }
@@ -242,76 +251,54 @@ void *sockclient(void *arg){
                 time_t now = timer.tv_sec;
     
                 /* read data from buffer */
-                pthread_mutex_lock(&threadParam->lock_buffer);
-                //printf("sockclient(0x%x): threadParam->buffer[%d].buffsize: %d\n", pthread_self(), ethx, threadParam->buffer[ethx].buffsize);
-                if(threadParam->buffer[ethx].buffsize > 0){
-                    snprintf(logmsg, sizeof(logmsg), "sockclient(0x%x): threadParam->buffer[%d].buffsize: %d, first item type %s\n", 
-                            pthread_self(), ethx, threadParam->buffer[ethx].buffsize, 
-                            threadParam->buffer[ethx].packet_q->next->packet->PacketType);
+                if(threadParam->data_buffer[ethx].buffsize > 0){
+                    snprintf(logmsg, sizeof(logmsg), "sockclient(0x%x): threadParam->data_buffer[%d].buffsize: %d, first item type %s\n", 
+                            pthread_self(), ethx, threadParam->data_buffer[ethx].buffsize, 
+                            threadParam->data_buffer[ethx].packet_q->next->packet->PacketType);
                     logging(LOGFILE, logmsg);
-                    /* p *threadParam
-                    $14 = {sockfd = 8, port = 46976, router = 0x608250, ls_db_size = 1, ls_db = {{Link_ID = "a", '\000' <repeats 30 times>, 
-                    des_router_id = '\000' <repeats 31 times>, des_port_id = 12589, src_router_id = "10.0.0.1", '\000' <repeats 17 times>, 
-                    src_port_id = 12589, Availability = 0, Link_Cost = {tv_sec = 52992208, tv_usec = 0}, LS_Age = 1397489400}, {
-                    Link_ID = '\000' <repeats 31 times>, des_router_id = '\000' <repeats 31 times>, des_port_id = 0, 
-                    src_router_id = '\000' <repeats 31 times>, src_port_id = 0, Availability = 0, Link_Cost = {tv_sec = 0, tv_usec = 0}, 
-                    LS_Age = 0} <repeats 1023 times>}, buffer = {{buffsize = 0, packet_q = 0x60c3a0}, {buffsize = 0, packet_q = 0x60c3e0}, 
-                    {buffsize = 0,   packet_q = 0x0} <repeats 126 times>}}
-                    */
     
-                    /* packet_q->next is the fist item in the queue
-                    (gdb) p *threadParam->buffer[0].packet_q
-                    $17 = {packet = 0x0, next = 0x60f000}
-                    (gdb) p packet
-                    $18 = (Packet *) 0x60f600
-                    (gdb) p *threadParam->buffer[0].packet_q->next
-                    $20 = {packet = 0x60f600, next = 0x60c3c0}
-                    */
-    
-    
-                    /* Neighbor packet */
-                    if(strcmp(threadParam->buffer[ethx].packet_q->next->packet->PacketType, "000") == 0){
-                        // not possible
-                    }
-                    /* Hello packet */
-                    else if(strcmp(threadParam->buffer[ethx].packet_q->next->packet->PacketType, "001") == 0){
-                        // do nothing
-                    }
-                    /* Ping packet */
-                    else if(strcmp(threadParam->buffer[ethx].packet_q->next->packet->PacketType, "011") == 0){
-                        // do nothing
-                    }
-                    /* LSA packet */
-                    else if(strcmp(threadParam->buffer[ethx].packet_q->next->packet->PacketType, "010") == 0){
-                        snprintf(logmsg, sizeof(logmsg), "sockclient(0x%x): forward LSA %s packet to %s\n", 
-                                pthread_self(), threadParam->buffer[ethx].packet_q->next->packet->RouterID, remote_server);
-                        logging(LOGFILE, logmsg);
-                        sendBufferLSA(clientfd, &threadParam->buffer[ethx]);
-                    }
                     /* Data or ACK packet */
-                    else if(strcmp(threadParam->buffer[ethx].packet_q->next->packet->PacketType, "100") == 0 ||
-                            strcmp(threadParam->buffer[ethx].packet_q->next->packet->PacketType, "110") == 0){
-                        snprintf(logmsg, sizeof(logmsg), "sockclient(0x%x): forward Data %s packet to %s\n", 
-                                pthread_self(), threadParam->buffer[ethx].packet_q->next->packet->RouterID, remote_server);
-                        logging(LOGFILE, logmsg);
-                        sendBufferData(clientfd, &threadParam->buffer[ethx]);
+                    if(strcmp(threadParam->data_buffer[ethx].packet_q->next->packet->PacketType, "100") == 0 ||
+                            strcmp(threadParam->data_buffer[ethx].packet_q->next->packet->PacketType, "110") == 0){
+                        //snprintf(logmsg, sizeof(logmsg), "sockclient(0x%x): forward Data %s packet to %s\n", 
+                        printf("sockclient(0x%x): forward Data %s packet to %s\n", 
+                                pthread_self(), threadParam->data_buffer[ethx].packet_q->next->packet->RouterID, remote_server);
+                        //logging(LOGFILE, logmsg);
+                        pthread_mutex_lock(&threadParam->data_buffer[ethx].lock_buffer);
+                        sendBufferData(clientfd, &threadParam->data_buffer[ethx]);
+                        pthread_mutex_unlock(&threadParam->data_buffer[ethx].lock_buffer);
                     }
     
                 }
-                pthread_mutex_unlock(&threadParam->lock_buffer);
+
+                if(threadParam->lsa_buffer[ethx].buffsize > 0){
+                    snprintf(logmsg, sizeof(logmsg), "sockclient(0x%x): threadParam->lsa_buffer[%d].buffsize: %d, first item type %s\n",
+                            pthread_self(), ethx, threadParam->lsa_buffer[ethx].buffsize,
+                            threadParam->lsa_buffer[ethx].packet_q->next->packet->PacketType);
+                    logging(LOGFILE, logmsg);
+
+                    /* LSA packet */
+                    if(strcmp(threadParam->lsa_buffer[ethx].packet_q->next->packet->PacketType, "010") == 0){
+                        snprintf(logmsg, sizeof(logmsg), "sockclient(0x%x): forward LSA %s packet to %s\n",
+                                pthread_self(), threadParam->lsa_buffer[ethx].packet_q->next->packet->RouterID, remote_server);
+                        logging(LOGFILE, logmsg);
+                        pthread_mutex_lock(&threadParam->lsa_buffer[ethx].lock_buffer);
+                        sendBufferLSA(clientfd, &threadParam->lsa_buffer[ethx]);
+                        pthread_mutex_unlock(&threadParam->lsa_buffer[ethx].lock_buffer);
+                    }
+                }
 
 
                 /* sending other packet */
-                pthread_mutex_lock(&threadParam->lock_send); // Critical section to read port files
                 /* hello message */
                 if(now % hello_interval ==0){
                     if(hello_sent == 0){
                         now1 = now;
                         hello_sent = 1;
         
-                        //pthread_mutex_lock(&lock_send); // Critical section to read port files
+                        pthread_mutex_lock(&threadParam->lock_send); // Critical section to read port files
                         sendHello(clientfd, router, atoi(portstr));
-                        //pthread_mutex_unlock(&lock_send); // Critical section end
+                        pthread_mutex_unlock(&threadParam->lock_send); // Critical section end
     
                         snprintf(logmsg, sizeof(logmsg), "sockclient(0x%x): Hello packet sent.\n", pthread_self());
                         logging(LOGFILE, logmsg);
@@ -326,9 +313,9 @@ void *sockclient(void *arg){
                         now1 = now;
                         ping_sent = 1;
         
-                        //pthread_mutex_lock(&lock_send); // Critical section to read port files
+                        pthread_mutex_lock(&threadParam->lock_send); // Critical section to read port files
                         sendPing(clientfd, router, timer, ethx);
-                        //pthread_mutex_unlock(&lock_send); // Critical section end
+                        pthread_mutex_unlock(&threadParam->lock_send); // Critical section end
     
                         snprintf(logmsg, sizeof(logmsg), "sockclient(0x%x): Ping packet sent.\n", pthread_self());
                         logging(LOGFILE, logmsg);
@@ -345,10 +332,10 @@ void *sockclient(void *arg){
                         ls_sequence_number++;
     
                         /* TODO: check acknowledgment, keep sending if no ack */
-                        //pthread_mutex_lock(&lock_send); // Critical section to read port files
+                        pthread_mutex_lock(&threadParam->lock_send); // Critical section to read port files
                         //printf("sockclient(0x%x): send LSA packet from %s to %s\n", pthread_self(), addrstr, remote_server);
                         sendNewLSA(clientfd, threadParam, ls_sequence_number, timer);
-                        //pthread_mutex_unlock(&lock_send); // Critical section end
+                        pthread_mutex_unlock(&threadParam->lock_send); // Critical section end
                         snprintf(logmsg, sizeof(logmsg), "sockclient(0x%x): LSA packet sent.\n", pthread_self());
                         logging(LOGFILE, logmsg);
                     }
@@ -356,7 +343,6 @@ void *sockclient(void *arg){
                         lsa_sent = 0;
                     }
                 }
-                pthread_mutex_unlock(&threadParam->lock_send); // Critical section end
     
                 usleep(1); //sleep some time for lock relase
      

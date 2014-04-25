@@ -85,26 +85,28 @@ void *serverthread(void *arg){
     }
     /* Endsystem, data packet */
     else if(strcmp(neighbor_req->PacketType, "100") == 0){
+        printf("serverthread(0x%x): got data from endsystem %s, enqueue...\n", pthread_self(), neighbor_req->RouterID);
         snprintf(logmsg, sizeof(logmsg), "serverthread(0x%x): got data from endsystem %s, enqueue...\n", 
                                           pthread_self(), neighbor_req->RouterID);
         logging(LOGFILE, logmsg);
         int endsysEthx = getEthx(router, neighbor_req->RouterID);
         repackData(router, neighbor_req);
-        pthread_mutex_lock(&threadParam->lock_buffer);
+        pthread_mutex_lock(&threadParam->data_buffer[endsysEthx].lock_buffer);
         addBufferData(threadParam, neighbor_req);
-        pthread_mutex_unlock(&threadParam->lock_buffer);
+        pthread_mutex_unlock(&threadParam->data_buffer[endsysEthx].lock_buffer);
 
         /* wait for ACK (110) */
         int sendACK = 0;
         while(sendACK == 0){
-            if(threadParam->buffer[endsysEthx].buffsize > 0){
-                pthread_mutex_lock(&threadParam->lock_buffer);
-                if(strcmp(threadParam->buffer[endsysEthx].packet_q->next->packet->PacketType, "110") == 0 ){
-                    sendBufferData(sockfd, &threadParam->buffer[endsysEthx]);
+            if(threadParam->data_buffer[endsysEthx].buffsize > 0){
+                if(strcmp(threadParam->data_buffer[endsysEthx].packet_q->next->packet->PacketType, "110") == 0 ){
+                    pthread_mutex_lock(&threadParam->data_buffer[endsysEthx].lock_buffer);
+                    sendBufferData(sockfd, &threadParam->data_buffer[endsysEthx]);
+                    pthread_mutex_unlock(&threadParam->data_buffer[endsysEthx].lock_buffer);
                     sendACK = 1;
                 }
-                pthread_mutex_unlock(&threadParam->lock_buffer);
             }
+            usleep(1);
         }
 
         /* each packet comes from end system will start a new socket,
@@ -125,7 +127,6 @@ void *serverthread(void *arg){
         while(1){
 
             /* Receive packet_req from client */
-            pthread_mutex_lock(&threadParam->lock_server);
 
             gettimeofday(&timer, &tzp);
 
@@ -165,26 +166,28 @@ void *serverthread(void *arg){
             else if(strcmp(packet_req->PacketType, "010") == 0){
                 /* use LSA to fill the LS Database */
                 //printf("serverthread: got LSA packet from %s\n", packet_req->RouterID);
-                //pthread_mutex_lock(&lock_server);
                 installLSA(threadParam, packet_req); // installs the new LSA in its link state database.
                 //genLSAACK(threadParam, packet_req);
                 //addBufferACK(threadParam, packet_req, ethx); // ready to send LSA ack
                 repackLSA(router, packet_req);
                 addBufferFlood(threadParam, packet_req, ethx, timer); // except the ethx from which it received the LSA.
-                //pthread_mutex_unlock(&lock_server); // Critical section end
-                genGraph(threadParam);
-                genRouting(threadParam);
-                //min_route(int sid, int did, int *gateway, int *metric);
+                pthread_mutex_lock(&threadParam->lock_graph);
+                genGraph(threadParam, addrstr);
+                genRouting(threadParam, addrstr);
+                pthread_mutex_unlock(&threadParam->lock_graph);
 
             }
             /* Data (100) or ACK (110) packet */
             else if(strcmp(packet_req->PacketType, "100") == 0 || strcmp(packet_req->PacketType, "110") == 0){
-                //printf("serverthread(0x%x): got data from %s, enqueue...\n", pthread_self(), packet_req->RouterID);
+                printf("serverthread(0x%x): got data from %s, enqueue...\n", pthread_self(), packet_req->RouterID);
                 repackData(router, packet_req);
+                //printf("serverthread(0x%x): packet repacked as %s\n", pthread_self(), packet_req->RouterID);
+                pthread_mutex_lock(&threadParam->data_buffer[ethx].lock_buffer);
+                //printf("serverthread(0x%x): entering into critical area, threadParam->data_buffer[ethx].buffsize: %d\n", pthread_self(), threadParam->data_buffer[ethx].buffsize);
                 addBufferData(threadParam, packet_req);
+                pthread_mutex_unlock(&threadParam->data_buffer[ethx].lock_buffer);
             }
    
-            pthread_mutex_unlock(&threadParam->lock_server); // Critical section end
             usleep(1); // sleep some time or other thread do not have chance to get the lock
         }
 
