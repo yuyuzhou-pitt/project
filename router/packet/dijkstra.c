@@ -228,7 +228,8 @@ int min_route(int sid, int did, int *gateway, int *metric, records nlist[])
     }
     if(chk==0)
     {
-        printf("\nSource Id not found.\n");
+        snprintf(logmsg, sizeof(logmsg), "dijkstra: Source Id not found: %d\n", sid);
+        logging(LOGFILE, logmsg);
         return -1;
     }
     chk=0;
@@ -243,7 +244,8 @@ int min_route(int sid, int did, int *gateway, int *metric, records nlist[])
     }
     if(chk==0)
     {
-        printf("\nDestination Id not found.\n");
+        snprintf(logmsg, sizeof(logmsg), "dijkstra: Destination Id not found: %d\n", did);
+        logging(LOGFILE, logmsg);
         return -1;
     }
 
